@@ -2,11 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import lasso_selection
 import get_data
+from scipy.optimize import curve_fit
+def gauss(x, H, A, x0, sigma):
+    return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
 
-path = '/Users/mp274748/Documents/'
-peaks = get_data.ntd_array(path+'20180709_23h07.BINLMO.ntp')
+path = '/Users/mp274748/Documents/data_arg/second_set'
+filename='/20211125_00h43.BINLMO21.2.ntp'
+filename_light='/20211125_00h43.BINLD21.2.ntp'
+filename_trigheat='/20211125_00h43.BINLD21.2_trigheat.ntp'
+peaks = get_data.ntd_array(path+filename)
 
 
 print(np.shape(peaks))
@@ -14,13 +20,14 @@ correlation = peaks[:,5]
 good = correlation > 0.997
 amp = peaks[good,2]
 
-t = peaks[good,0]/2000
+t = peaks[good,0]/5000
 
 correlation = peaks[good,5]
 
 baseline = peaks[good,3]
 
 fig3, axs3= plt.subplots(1)
+fig4, axs4= plt.subplots(1)
 fig2, axs2= plt.subplots(2)
 fig,axs=plt.subplots(2,2)
 # Pulse energy vs Time raw data heat channel
@@ -39,7 +46,7 @@ axs[1,0].set_title('Pulse energy vs Baseline raw data heat channel: Heater Event
 axs[1,0].set_xlabel('Baseline in arbitrary unit')
 axs[1,0].set_ylabel('Pulse energy in arbitrary unit')
 
-
+axs2[1].hist(amp,3000,facecolor='r',label='stabilized data',alpha=0.5)
 
 
 def accept(event):
@@ -65,15 +72,20 @@ def accept(event):
         axs[1, 1].set_xlabel('Baseline in arbitrary unit')
         axs[1, 1].set_ylabel('Pulse energy in arbitrary unit')
         fig.canvas.draw()
-        p=np.poly1d([ 1.41014879,12.29141961])
+        #z=[ 1.41014879,12.29141961]
+        #z=[1,0]
+        z= [ 1.17286046, 78.40799081]
+        p = np.poly1d(z)
         amp_stab_fit=p(amp_stab)
 
-
-        axs2[1].hist(amp_stab_fit,3000,facecolor='r',label='stabilized data',alpha=0.5)
+        axs2[1].clear()
+        axs2[1].hist(amp_stab_fit,4000,facecolor='r',label='stabilized data',alpha=0.5)
+        axs2[1].set_xlim(0,7000)
         axs2[1].set_xlabel('Pulse energy in KeV')
         axs2[1].set_ylabel('Number of events')
         fig2.canvas.draw()
-        axs3.scatter(amp_stab_fit[good2], ampl[good2]*100/bin_center[i_max], s=0.1)
+
+        axs3.scatter(amp_stab_fit[amp_stab_fit<7000], amp[amp_stab_fit<7000]*100/parameters[2], s=0.1)
         fig3.canvas.draw()
 
 
@@ -81,7 +93,8 @@ fig.canvas.mpl_connect("key_press_event", accept)
 selector = lasso_selection.SelectFromCollection(axs[1,0], pts)
 # light
 
-peaksl = get_data.ntd_array(path+'20180709_23h07.BINLD_trigheat.ntp')
+
+peaksl = get_data.ntd_array(path+filename_trigheat)
 
 tl = peaksl[good,0]
 ampl = peaksl[good,2]
@@ -97,17 +110,20 @@ axs3.set_xlabel('Heat amplitude')
 axs3.set_title('Heat amplitude VS Light amplitude for alpha discrimination')
 
 
-peakslt=get_data.ntd_array('/Users/mp274748/Documents/20180709_23h07.BINLD.ntp')
+peakslt=get_data.ntd_array(path + filename_light)
 corlt=peakslt[:,5]
 goodlt = corlt > 0.99
 print(peakslt.shape)
 amplt=peakslt[goodlt,2]
-n, bins = np.histogram(amplt,600)
+
+n, bins,patches = axs4.hist(amplt,300)
 bin_center=(bins[:-1]+bins[1:])/2
-i_max=np.argmax(n[30:])+30
-bin_center[i_max]
-amplt_fit = amplt*100/bin_center[i_max]
-axs2[0].hist(amplt_fit,600,facecolor='b',label='RAW data')
+parameters, covariance = curve_fit(gauss, bin_center, n,p0=[6,75,13000,2000])
+x_plot=np.linspace(bin_center.min(),bin_center.max(),1000)
+axs4.plot(x_plot,gauss(x_plot,*parameters))
+
+amplt_fit = amplt*100/parameters[2]
+axs2[0].hist(amplt_fit,300,facecolor='b',label='RAW data')
 axs2[0].set_xlabel('Pulse energy in keV')
 axs2[0].set_ylabel('Number of events')
 #axs3.set_xlim(0)
