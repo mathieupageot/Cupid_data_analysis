@@ -5,79 +5,78 @@ import matplotlib.gridspec as gridspec
 from matplotlib.widgets import Slider
 
 import get_data
-path, filename, filename_light, filename_trigheat = get_data.get_path()
+path, filename, filename_light, filename_trigheat,filenum= get_data.get_path()
+peaks = get_data.ntd_array(path+filename)
 amp= np.load(path+'amp_stab.npy')
+correlation = peaks[:,5]
+Riset=peaks[:, 11]
+correl_cut=0.9998
+Rise_cut=0.25
+good = np.logical_and(correlation>correl_cut,Riset<Rise_cut)
 
-fig,ax=plt.subplots()
-fig.subplots_adjust(bottom=0.4)
+
+amp=amp[good]
+fig3,ax3 = plt.subplots()
 fig2, ax2 = plt.subplots()
-n, bins, patches = ax.hist(amp, 1000)
-gs = gridspec.GridSpec(4, 4,figure=fig)
-gs.update(left=0.1, right=0.9, bottom=0.1, top=0.2, hspace=0.1, wspace=0.5)
-data=np.zeros(16)
+fig,ax=plt.subplots()
+fig.subplots_adjust(left=0.25)
+
+n , bins = np.histogram(amp, 1000)
+center= (bins[:-1] + bins[1:]) / 2
+if filenum == 2:
+    data_E=np.array([352,609,295,242])
+    data_amp=np.array([1114,640,537,433])
+if filenum == 3:
+    data_E = np.array([352,609,768,1120,1238,1764])
+    data_amp = np.array([145,319,502,246,460,714])
+data_E=np.sort(data_E)
+data_amp=np.sort(data_amp)
 lines=[]
-for i in range(8):
-    line,=ax.plot([data[i*2],data[i*2]],[0,n.max()*1.1], label=i,alpha=0.5)
-    lines.append(line)
-z = [0,0]
+z = np.polyfit(data_amp,data_E,1)
+#z  = [1,0] #4800/9000
 p = np.poly1d(z)
-scat=ax2.scatter(data[::2], data[1::2])
-x = np.linspace(min(data[::2]) - max(data[::2]) * 0.1, max(data[::2]) * 1.1, 700)
+
+n2, bins2 = np.histogram(p(amp)[:6000], 1000)
+center2= (bins2[:-1] + bins2[1:]) / 2
+
+for i in range(len(data_amp)):
+    line,=ax.plot([data_amp[i],data_amp[i]],[0,n.max()], label=str(data_E[i])+' keV',alpha=0.4,linewidth=.5)
+    #line2, = ax3.plot([p(data_amp[i]), p(data_amp[i])], [0, n2.max()], label=str(np.round(p(data_amp[i]),1)) + ' keV', alpha=0.4, linewidth=.5)
+    line2, = ax3.plot([data_E[i],data_E[i]], [0, n2.max()], label=str(np.round(data_E[i],1)) + ' keV', alpha=0.4, linewidth=3)
+
+    lines.append(line)
+    ax3.legend()
+    ax.legend()
+
+scat=ax2.scatter(data_amp,data_E)
+x = np.linspace(min(data_amp) - max(data_amp) * 0.1, max(data_amp) * 1.1, 700)
 y = p(x)
 line, = ax2.plot(x, y, c='r')
 
-
-axes = [fig.add_subplot(gs[i, j]) for i, j in [(i, j) for i in range(4) for j in range(4)]]
-T = []
-for i in range(4):
-    for j in range(2):
-        T.append(
-            TextBox(axes[j*2 + i * 4], 'Amp ' + str(j*2 + i * 4), initial=str(0.), hovercolor='0.975', label_pad=0.1))
-        T.append(
-            TextBox(axes[j*2 + i * 4 + 1], 'E ' + str(j*2 + i * 4), initial=str(0.), hovercolor='0.975', label_pad=0.1))
-
-def submit(val):
-    data=np.array([float(tb.text) for tb in T])
-    print(data)
-    for i in range(8):
-        lines[i].set_xdata([data[i*2],data[i*2]])
-    x_data=data[::2]
-    print(x_data)
-    y_data=data[1::2]
-    sel = x_data > 0.
-    print(x_data[sel])
-    if len(x_data[sel])>1:
-
-
-        z = np.polyfit(x_data[sel], y_data[sel], 1)
-        p = np.poly1d(z)
-        scat.set_offsets(np.array([data[::2], data[1::2]]).T)
-        x = np.linspace(min(data[::2]) - max(data[::2]) * 0.1, max(data[::2]) * 1.1, 700)
-        y = p(x)
-        line.set_xdata(x)
-        line.set_ydata(y)
-        ax2.set_xlim(mix(x),max(x))
-        ax2.set_ylim(mix(y), max(y))
-
-
-    fig.canvas.draw_idle()
-    fig2.canvas.draw()
+hist3,=ax3.plot(center2,n2,linewidth=.5,ds='steps-mid')
+ax3.set_title('Heat Channel Spectrum Calibrated')
+ax3.set_xlabel('Energy in keV')
+ax3.set_ylabel('Counts/6 keV')
+hist,=ax.plot(center,n,linewidth=.5,ds='steps-mid')
 axbin = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
 amp_slider = Slider(
         ax=axbin,
         label="Bins",
-        valmin=500,
+        valmin=300,
         valmax=5000,
-        valinit=700,
-        orientation="vertical"
+        valinit=1000,
+        orientation="vertical",
+        valstep=1.
     )
 def update(val):
-    n, _ = np.histogram(amp, val)
-    for count, rect in zip(n, patches.patches):
-        rect.set_height(count)
-    fig.canvas.draw_idle()
+    n, bins = np.histogram(amp, int(val))
+    center = (bins[1:] + bins[:-1]) / 2
+    hist.set_xdata(center)
+    hist.set_ydata(n)
+    fig.canvas.draw()
+    for i,line in enumerate(lines):
+        line.set_ydata([0,n.max()])
+    ax.set_ylim(0,n.max())
 amp_slider.on_changed(update)
-for tb in T:
-    tb.on_submit(submit)
-
+print(z)
 plt.show()
