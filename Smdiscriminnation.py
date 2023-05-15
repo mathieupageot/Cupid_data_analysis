@@ -19,7 +19,7 @@ def gauss(x,x0,sigma,A):
 
 sigmas=[]
 
-En=np.arange(0,6000,300)
+En=np.arange(0,6000,50)
 centerE = (En[:-1] + En[1:]) / 2
 axs=[]
 for i in range(len(En)-1):
