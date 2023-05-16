@@ -17,7 +17,7 @@ fig6, axs6 = plt.subplots(1)  # correlation plot
 fig5, axs5 = plt.subplots(1)  # risetime plot
 
 fig1, axs1 = plt.subplots(1)  # TV plot
-fig3, axs3 = plt.subplots(1)  # heatvslight
+fig3, ax3 = plt.subplots(1)  # heatvslight
 path, filename, filename_light, filename_trigheat, filenum = get_data.get_path()
 peaks = get_data.ntd_array(path + filename)
 amp_stab = np.load(path + 'amp_stab.npy')
@@ -48,6 +48,7 @@ t = peaks[:, 0] / 5000
 TV = peaks[:, 8]  # parabolic cut
 Riset = peaks[:, 11]
 decayt = peaks[:, 12]
+Sm = peaks[:, 9] / amp_stab
 
 correl_cut = correlation > f_corr(amp_stab_fit)
 Rise_cut = Riset < 0.25
@@ -132,13 +133,16 @@ axs4.set_title('Landeau fit of the light channel')
 
 if filenum == 2:
     amplt_fit = amplt * 100 / popt[0]
-    print(100 / popt[0])
-if filenum == 3:
+    ampl_fit = ampl * 100 / popt[0]
+    print('keV/ADU for light: ' + str(100 / popt[0]) + ' & error: ' + str(np.sqrt(pcov[0, 0])* 100 / popt[0]**2))
+elif filenum == 3:
     amplt_fit = amplt * 260 / popt[0]
-    print(260 / popt[0])
+    ampl_fit = ampl * 260 / popt[0]
+    print('keV/ADU for light: ' + str(260 / popt[0]) + ' & error: ' + str(np.sqrt(pcov[0, 0])* 620 / popt[0]**2))
 else:
     amplt_fit = amplt * 100 / popt[0]
-    print(100 / popt[0])
+    ampl_fit = ampl * 100 / popt[0]
+    print('keV/ADU for light: ' + str(100 / popt[0]) + ' & error: ' + str(np.sqrt(pcov[0, 0])* 100 / popt[0]**2))
 
 n, bins = np.histogram(amplt_fit[amplt_fit < 6000], 500)
 center = (bins[:-1] + bins[1:]) / 2
@@ -146,12 +150,30 @@ ax7.plot(center, n, linewidth=.5, ds='steps-mid', label='Calibrated')
 ax7.set_xlabel('Light Channel Energy in keV')
 ax7.set_ylabel('Counts/12 keV')
 
-pts = axs3.scatter(amp_stab_fit[good], ampl * 100 / popt[0], s=0.1)
-axs3.set_ylabel('Light amplitude in keV')
-axs3.set_xlabel('Heat amplitude in keV')
-axs3.set_title('Heat amplitude VS Light amplitude for alpha discrimination')
+
+
+pts = ax3.scatter(amp_stab_fit[good], ampl_fit, s=0.1)
+ax3.set_ylabel('Light amplitude in keV')
+ax3.set_xlabel('Heat amplitude in keV')
+ax3.set_title('Heat amplitude VS Light amplitude for alpha discrimination')
+ax3.set_ylim(-5,5)
+
 fig10, ax10 = plt.subplots()
-ax10.scatter(amp_stab_fit, peaks[:, 9] / amp_stab, s=0.1)
+ax10.scatter(amp_stab_fit, Sm, s=0.1)
 ax10.set_xlabel('Amplitude in keV')
 ax10.set_ylabel('S$_m$/m')
+ax10.set_title('The Fitted Amplitude vs Energy')
+ymean=np.mean(Sm)
+yvar=np.var(Sm)
+ax10.set_ylim(ymean-100*yvar,ymean+100*yvar)
+
+fig11, ax11 = plt.subplots()
+LY=ampl_fit/amp_stab_fit[good]
+ax11.scatter(amp_stab_fit[good],LY,s=0.1)
+ax11.set_ylabel('LY ADU')
+ax11.set_xlabel('Heat amplitude in keV')
+ax11.set_title('Heat Energy vs LY')
+ymean=np.mean(LY)
+yvar=np.var(LY)
+ax11.set_ylim(ymean-yvar,ymean+yvar)
 plt.show()
