@@ -32,7 +32,7 @@ if filenum == 3:
 data_E=np.sort(data_E)
 data_amp=np.sort(data_amp)
 lines=[]
-z = np.polyfit(data_amp,data_E,1)
+z, cov= np.polyfit(data_amp,data_E,1,cov=True)
 #z  = [1,0] #4800/9000
 p = np.poly1d(z)
 
@@ -78,5 +78,6 @@ def update(val):
         line.set_ydata([0,n.max()])
     ax.set_ylim(0,n.max())
 amp_slider.on_changed(update)
-print(z)
+print('keV/ADU for heat: '+ str(z[0]) + ' & error ' +str(np.sqrt(np.diag(cov))[0]))
+
 plt.show()
