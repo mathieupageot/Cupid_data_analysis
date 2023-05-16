@@ -26,10 +26,9 @@ def lin(x, a, b, c):
 
 
 sigmas = []
-
+mus = []
 En = np.arange(0, 2000, 50)
 centerE = (En[:-1] + En[1:]) / 2
-axs = []
 for i in range(len(En) - 1):
     dE = np.logical_and(E > En[i], E < En[i + 1])
     selSm = Sm[dE]
@@ -38,22 +37,24 @@ for i in range(len(En) - 1):
 
     param, _ = curve_fit(gauss, center, n, [1, 0.05, 20])
     sigmas.append(3 * np.abs(param[1]))
+    mus.append(param[0])
     x = np.linspace(center.min(), center.max(), 1000)
-    # fig,ax = plt.subplots()
-    # axs.append(ax)
-    # axs[-1].plot(center,n)
-    # axs[-1].plot(x,gauss(x,*param))
+    if i == 9:
+        fig,ax=plt.subplots()
+        ax.plot(center,n)
+        ax.plot(x,gauss(x,*param))
 sigmas = np.array(sigmas)
-
-plt.scatter(E, Sm, s=0.1)
+mus=np.array(mus)
+fig2, ax2 = plt.subplots()
+ax2.scatter(E, Sm, s=0.1)
 p0_up = [1,-1,1.04]
 p0_down = [-1,-1,0.97]
-popt_up, _ = curve_fit(lin, centerE, sigmas + 1,p0_up)
-popt_down, _ = curve_fit(lin, centerE, -sigmas + 1,p0_down)
+popt_up, _ = curve_fit(lin, centerE, sigmas + mus,p0_up)
+popt_down, _ = curve_fit(lin, centerE, -sigmas + mus,p0_down)
 
 x = np.linspace(centerE.min(), centerE.max(), 1000)
-plt.plot(x,lin(x,*popt_up),c='r')
-plt.plot(x,lin(x,*popt_down),c='g')
-plt.scatter(centerE, sigmas + 1)
-plt.scatter(centerE, -sigmas + 1)
+ax2.plot(x,lin(x,*popt_up),c='r')
+ax2.plot(x,lin(x,*popt_down),c='g')
+ax2.scatter(centerE, sigmas + mus)
+ax2.scatter(centerE, -sigmas + mus)
 plt.show()
