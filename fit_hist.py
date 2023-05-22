@@ -5,15 +5,27 @@ import matplotlib.gridspec as gridspec
 from matplotlib.widgets import Slider
 
 import get_data
-path, filename, filename_light, filename_trigheat,filenum= get_data.get_path()
+path, filename, filename_light, filename_trigheat,filenum,filebis= get_data.get_path()
 peaks = get_data.ntd_array(path+filename)
 amp= np.load(path+'amp_stab.npy')
 correlation = peaks[:,5]
 Riset=peaks[:, 11]
-correl_cut=0.9998
-Rise_cut=0.25
-good = np.logical_and(correlation>correl_cut,Riset<Rise_cut)
+correl_cut=0.99
+if 1 == 1 :
+    sel_amp = amp<500
+    amp=amp[sel_amp]
+    correlation=correlation[sel_amp]
+    Riset=Riset[sel_amp]
+def f_corr(x):
+    corr_end = 0.9
+    corr_0 = 0.80
+    return -1 / (x + 1 / (corr_end - corr_0)) + corr_end
 
+good = np.logical_and(correlation>f_corr(correlation),amp<2000)
+if 1==1:
+    fig4,ax4 = plt.subplots()
+    ax4.scatter(amp,correlation,s=0.1)
+    ax4.plot(np.sort(amp),f_corr(np.sort(amp)))
 
 amp=amp[good]
 fig3,ax3 = plt.subplots()
@@ -21,7 +33,8 @@ fig2, ax2 = plt.subplots()
 fig,ax=plt.subplots()
 fig.subplots_adjust(left=0.25)
 
-n , bins = np.histogram(amp, 1000)
+ini=300
+n , bins = np.histogram(amp, ini)
 center= (bins[:-1] + bins[1:]) / 2
 if filenum == 2:
     data_E=np.array([352,609,295,242])
@@ -29,14 +42,43 @@ if filenum == 2:
 if filenum == 3:
     data_E = np.array([352,609,768,1120,1238,1764])
     data_amp = np.array([145,319,502,246,460,714])
+if filenum == 4:
+    if filebis == 1:
+        data_E = np.array([510.77 ,583.2, 609.312, 911.204,2614.533])
+        data_amp = np.array([254, 298, 313, 472, 1362])
+    if filebis == 2:
+        data_E = np.array([510.77,583.2, 609.312, 911.204, 2614.533])
+        data_amp = np.array([274,313,335,572,1822])
+    if filebis == 5:
+        data_E = np.array([ 583.2, 911.204,968.971, 2614.533])
+        data_amp = np.array([147,112,154,340])
+    if filebis == 6:
+        data_E = np.array([911.204,968.971, 2614.533,583.2])
+        data_amp = np.array([48,49.5,127,32.5])
+    if filebis == 3:
+        data_E = np.array([ 510.77 ,  583.191,911.204,968.971, 2614.533])
+        data_amp = np.array([ 265,  323,544,586, 1692])
+    if filebis == 4:
+        data_E = np.array([ 583.191, 609.312,911.204,968.971, 2614.533])
+        data_amp = np.array([61.4,63,84.6,88.2 , 207])
+    if filebis == 7:
+        data_E = np.array([  510.77,609.312,  583.191,911.204,968.971, 2614.533])
+        data_amp = np.array([164, 183, 198,318,350, 1006])
+    if filebis == 8:
+        data_E = np.array([ 583.191, 911.204,968.971, 2614.533])
+        data_amp = np.array([93, 141,151, 384])
 data_E=np.sort(data_E)
 data_amp=np.sort(data_amp)
 lines=[]
-z, cov= np.polyfit(data_amp,data_E,1,cov=True)
+if len(data_E)>2:
+    z, cov= np.polyfit(data_amp,data_E,1,cov=True)
+else :
+    z = np.polyfit(data_amp, data_E, 1)
+    cov=np.ones((2,2))
 #z  = [1,0] #4800/9000
 p = np.poly1d(z)
 
-n2, bins2 = np.histogram(p(amp)[:6000], 1000)
+n2, bins2 = np.histogram(p(amp), ini)
 center2= (bins2[:-1] + bins2[1:]) / 2
 
 for i in range(len(data_amp)):
@@ -62,9 +104,9 @@ axbin = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
 amp_slider = Slider(
         ax=axbin,
         label="Bins",
-        valmin=300,
-        valmax=5000,
-        valinit=1000,
+        valmin=100,
+        valmax=1200,
+        valinit=ini,
         orientation="vertical",
         valstep=1.
     )
@@ -79,5 +121,6 @@ def update(val):
     ax.set_ylim(0,n.max())
 amp_slider.on_changed(update)
 print('keV/ADU for heat: '+ str(z[0]) + ' & error ' +str(np.sqrt(np.diag(cov))[0]))
+print('offset: '+str(z[1]))
 
 plt.show()
