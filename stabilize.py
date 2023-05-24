@@ -7,18 +7,20 @@ def gauss(x, H, A, x0, sigma):
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
-path,filename, filename_light, filename_trigheat,filenum = get_data.get_path()
+path,filename, filename_light, filename_trigheat,_ = get_data.get_path()
 peaks = get_data.ntd_array(path+filename)
-light = get_data.ntd_array(path+filename_trigheat)
+#light = get_data.ntd_array(path+filename_trigheat)
+
 correlation = peaks[:,5]
 amp = peaks[:,2]
+Sm = peaks[:, 9] / amp
 t = peaks[:,0]/5000
 baseline = peaks[:,3]
 
 
 fig,axs = plt.subplots(2)
 fig2,axs2 = plt.subplots()
-pts=axs2.scatter(amp,light[:,2],s=0.1)
+pts=axs2.scatter(amp,Sm,s=0.1)
 def accept(event):
     if event.key == "enter":
         def accept2(event):
