@@ -4,6 +4,7 @@ import get_data
 from landaupy import langauss
 import gaussian_fit_light
 
+
 def gauss(x, h, a, x0, sigma):
     return h + a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
@@ -19,20 +20,19 @@ def get_heat(path,filename,p):
     print((peaks[0,0]-peaks[-1,0])/5000/60/60)
     return E,correlation,TV,riset,decayt,Sm
 
-def f_corr(x):
-    corr_end = 0.9998
-    corr_0 = 0.994
-    return -1 / (x + 1 / (corr_end - corr_0)) + corr_end
+def f(x, a, b, c):
+    return a * x ** b + c
 def f_tv(x, a, b, c):
     return np.exp((x - a) / b) * c
 
-def plot_TV(E,TV,TV_cut):
+def plot_TV(E,TV,TV_cut,para_TV):
     fig1, axs1 = plt.subplots(1)
     axs1.scatter(E, TV, s=0.1)
     axs1.scatter(E[TV_cut], TV[TV_cut], s=0.1)
     xp = np.linspace(0, 80000)
-    axs1.plot(xp, f_tv(xp, *para))
+    axs1.plot(xp, f(xp, *para_TV))
     axs1.set_xlabel('Pulse energy in keV')
+    axs1.set_ylim(0,TV.max())
     axs1.set_ylabel('TV')
     axs1.set_title('Energy vs TV')
 
@@ -51,12 +51,12 @@ def plot_decay(E,decayt):
     ax.set_xlabel('Pulse energy in keV')
     ax.set_ylabel('Decay time in s')
     ax.set_title('Energy vs Decay Time')
-def plot_corr(E,correlation):
+def plot_corr(E,correlation,para):
     fig6, axs6 = plt.subplots()
     axs6.scatter(E, correlation, s=0.1)
-    axs6.set_ylim(0.90, 1.01)
+    axs6.set_ylim(0.98, 1.)
     xcor = np.linspace(E.min(), E.max(), 1000)
-    axs6.plot(xcor, f_corr(xcor), c='r', label='correlation cut')
+    axs6.plot(xcor, f(xcor,*para), c='r', label='correlation cut')
     axs6.legend()
     axs6.set_title('Correlation vs Pulse energy raw data heat channel')
     axs6.set_ylabel('Correlation normalized')
@@ -154,16 +154,25 @@ def plot_LY(E_sel,LY):
 if __name__ == '__main__':
     path, filename, filename_light, filename_trigheat, p= get_data.get_path()
     E, correlation, TV, riset, decayt, Sm = get_heat(path, filename, p)
-    correl_cut = correlation > f_corr(E)
+    try:
+        para_corr = np.load(path+filename.strip(".ntp")+'_'+'correlation'+".npy")
+    except FileNotFoundError:
+        print('No correlation cut found')
+        para_corr = np.array([-1,-1,0.80])
+    correl_cut = correlation > f(E,*para_corr)
     rise_cut = riset < 0.25
     sel = np.logical_and(correl_cut, rise_cut)
-    para = [36578.7450938, 8284.52785707, 101708.98640136]
-    TV_cut = f_tv(E, *para) < TV
+    try:
+        para_TV = np.load(path+filename.strip(".ntp")+'_'+'TV'+".npy")
+    except FileNotFoundError:
+        print('No TV cut found')
+        para_TV = np.array([4,4,1])
+    TV_cut = f(E, *para_TV) > TV
     E_sel = E[sel]
-    plot_TV(E, TV, TV_cut)
+    plot_TV(E,TV,TV_cut,para_TV)
     plot_rise(E, riset)
     plot_decay(E, decayt)
-    plot_corr(E, correlation)
+    plot_corr(E, correlation,para_corr)
     plot_Sm(E, Sm)
     hist_heat_cut(E, TV_cut, correl_cut)
     if filename_light != 0 :
