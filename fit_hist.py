@@ -55,8 +55,11 @@ if __name__ == "__main__":
     amp= np.load(path+'amp_stab.npy')
     correlation = peaks[:,5]
     Riset=peaks[:, 11]
-    correl_cut=0.99
-    para_cut = np.load(path+filename.strip("ntp")+"npy")
+    try:
+        para_cut = np.load(path+filename.strip(".ntp")+'_'+'correlation'+".npy")
+    except FileNotFoundError:
+        para_corr = np.array([-1, -1, 0.80])
+
     good = np.logical_and(correlation>lin(correlation,*para_cut),amp<2000)
     plot_corr_cut(amp,para_cut)
     amp=amp[good]
