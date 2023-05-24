@@ -18,8 +18,8 @@ Riset = peaks[:, 11]
 decayt = peaks[:, 12]
 X = []
 Y = []
-cut_name = 'correlation'
-
+#cut_name = 'correlation'
+cut_name = 'TV'
 
 
 
@@ -38,14 +38,17 @@ axb = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
 axc = plt.axes([0.25, 0.2, 0.65, 0.03], facecolor=axcolor)
 
 if cut_name == 'TV':
-    a0=2
-    b0=1e6
+    a0=0.0005
+    b0=2
     c0=1
     cut = f(amp_stab_fit, a0, b0, c0) > TV
     pts = ax.scatter(amp_stab_fit, TV, s=0.1)
     ax.set_xlabel('Pulse energy in keV')
     ax.set_ylabel('TV')
     ax.set_title('Energy vs TV')
+    sa = Slider(axa, 'a', 0, 0.001, valinit=a0)
+    sb = Slider(axb, 'b', 0, 4, valinit=b0)
+    sc = Slider(axc, 'Curvature', 0, 1000, valinit=c0)
 elif cut_name == 'correlation':
     a0 = -1
     b0 = -1
@@ -56,10 +59,11 @@ elif cut_name == 'correlation':
     ax.set_ylabel('correlation')
     ax.set_title('Energy vs correlation')
     ax.set_ylim(0.99,1)
+    sa = Slider(axa, 'a', -100, 0, valinit=a0)
+    sb = Slider(axb, 'b', -2, 0, valinit=b0)
+    sc = Slider(axc, 'Curvature', 0.99, 1., valinit=c0)
 
-sa = Slider(axa, 'a', -100, 100, valinit=a0)
-sb = Slider(axb, 'b', -2, 2, valinit=b0)
-sc = Slider(axc, 'Curvature', 0.99, 1.01, valinit=c0)
+
 amp = amp_stab_fit[cut]
 nTV, binsTV = np.histogram(amp[amp < 6000], 3000)
 centerTV = (binsTV[:-1] + binsTV[1:]) / 2
@@ -95,7 +99,7 @@ def save(event):
     b = sb.val
     c = sc.val
 
-    np.save(path+filename.strip("ntp")+"npy",[a,b,c])
+    np.save(path+filename.strip(".ntp")+'_'+cut_name+".npy",[a,b,c])
     print(a,b,c)
 
 sa.on_changed(update)
