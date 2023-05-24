@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import get_data
 from landaupy import langauss
 import gaussian_fit_light
+import datetime
 
 
 def gauss(x, h, a, x0, sigma):
@@ -17,7 +18,7 @@ def get_heat(path,filename,p):
     riset = peaks[:, 11]
     decayt = peaks[:, 12]
     Sm = peaks[:, 9] / amp_stab
-    print((peaks[0,0]-peaks[-1,0])/5000/60/60)
+    print("acquisition duration(h:m:s):",str(datetime.timedelta(hours=np.round((peaks[-1,0]-peaks[0,0])/5000/60/60,2))))
     return E,correlation,TV,riset,decayt,Sm
 
 def f(x, a, b, c):
