@@ -7,16 +7,9 @@ import gaussian_fit_light
 def gauss(x, h, a, x0, sigma):
     return h + a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
-def get_heat(path,filename,filenum):
+def get_heat(path,filename,p):
     peaks = get_data.ntd_array(path + filename)
     amp_stab = np.load(path + 'amp_stab.npy')
-    if filenum == 2:
-        z = [0.54076489, 6.23910689]
-    if filenum == 3:
-        z = [2.47881842, -10.57679343]
-    else:
-        z = [1, 0]
-    p = np.poly1d(z)
     E = p(amp_stab)
     correlation = peaks[:, 5]
     TV = peaks[:, 8]
@@ -159,8 +152,8 @@ def plot_LY(E_sel,LY):
     ax11.set_ylim(ymean-yvar,ymean+yvar)
 
 if __name__ == '__main__':
-    path, filename, filename_light, filename_trigheat, filenum = get_data.get_path()
-    E, correlation, TV, riset, decayt, Sm = get_heat(path, filename, filenum)
+    path, filename, filename_light, filename_trigheat, p= get_data.get_path()
+    E, correlation, TV, riset, decayt, Sm = get_heat(path, filename, p)
     correl_cut = correlation > f_corr(E)
     rise_cut = riset < 0.25
     sel = np.logical_and(correl_cut, rise_cut)
