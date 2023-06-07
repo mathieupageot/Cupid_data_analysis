@@ -2,15 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from matplotlib.widgets import Slider
-
+from cuts import f
 import get_data
-def lin(x, a, b, c):
-    return a * x ** b + c
+
 
 def plot_corr_cut(amp,para_cut):
     figcorr,axcorr = plt.subplots()
     axcorr.scatter(amp,correlation,s=0.1)
-    axcorr.plot(np.sort(amp),lin(np.sort(amp),*para_cut),c='r')
+    axcorr.plot(np.sort(amp),f(np.sort(amp),*para_cut),c='r')
     axcorr.set_ylim(0.98,1)
     axcorr.set_ylabel('Correlation')
     axcorr.set_xlabel('Amplitude in arbitrary unit')
@@ -53,20 +52,25 @@ if __name__ == "__main__":
     path, filename, filename_light, filename_trigheat,data_E,data_amp= get_data.get_path(peak=True)
     peaks = get_data.ntd_array(path+filename)
     amp= np.load(path+'amp_stab.npy')
-    correlation = peaks[:,5]
-    Riset=peaks[:, 11]
+    rt = peaks[:, 11]
+    cut_test = np.ones_like(amp,dtype=bool)
+    correlation = peaks[cut_test,5]
+    amp = amp[cut_test]
+
     try:
         para_cut = np.load(path+filename.strip(".ntp")+'_'+'correlation'+".npy")
     except FileNotFoundError:
-        para_corr = np.array([-1, -1, 0.80])
+        para_cut = np.array([-1, -1, 0.80])
+        print('no correlation cut found')
 
-    good = np.logical_and(correlation>lin(correlation,*para_cut),amp<2000)
+
+    good = np.logical_and(correlation>f(amp,*para_cut),amp<data_amp[-1]*1.1)
     plot_corr_cut(amp,para_cut)
     amp=amp[good]
-    fig, axRAW = plt.subplots()
+    fig, axcalib = plt.subplots()
     fig.subplots_adjust(left=0.25)
     axbin = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
-    axcalib = axRAW.twiny()
+    axRAW = axcalib.twiny()
 
 
 
