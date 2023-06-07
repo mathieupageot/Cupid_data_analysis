@@ -3,15 +3,9 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 import get_data
 
-path, filename, filename_light, filename_trigheat, filenum = get_data.get_path()
+path, filename, filename_light, filename_trigheat, p = get_data.get_path()
 peaks = get_data.ntd_array(path + filename)
-if filenum == 2:
-    z = [0.54076489, 6.23910689]
-if filenum == 3:
-    z = [2.47881842, -10.57679343]
-else:
-    z = [1, 0]
-p = np.poly1d(z)
+
 amp = np.load(path + 'amp_stab.npy')
 Sm = peaks[:, 9] / amp
 E = p(amp)
