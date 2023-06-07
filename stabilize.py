@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import lasso_selection
 import get_data
+from matplotlib.widgets import Button
 from scipy.optimize import curve_fit
 def gauss(x, H, A, x0, sigma):
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
-
+amp_stab = []
 path,filename, filename_light, filename_trigheat,_ = get_data.get_path()
 peaks = get_data.ntd_array(path+filename)
 #light = get_data.ntd_array(path+filename_trigheat)
@@ -19,11 +20,17 @@ baseline = peaks[:,3]
 
 
 fig,axs = plt.subplots(2)
+
+plt.subplots_adjust(bottom=0.25)
+button_ax = plt.axes([0.8, 0.05, 0.1, 0.05])
+button = Button(button_ax, 'Save')
 fig2,axs2 = plt.subplots()
+
 pts=axs2.scatter(amp,Sm,s=0.1)
 def accept(event):
     if event.key == "enter":
         def accept2(event):
+            global amp_stab
             if event.key == "enter":
                 selector2.disconnect()
                 axs[0].scatter(baseline, amp, s=0.3)
@@ -38,7 +45,9 @@ def accept(event):
                 axs[1].scatter(baseline, amp_stab, s=0.1)
                 axs[1].set_ylabel('Heat Amplitude Stabilized')
                 axs[1].set_xlabel('Heat Baseline Stabilized')
-                np.save(path + 'amp_stab.npy', amp_stab)
+                print(len(amp_stab))
+
+
 
                 fig.canvas.draw()
 
@@ -50,9 +59,12 @@ def accept(event):
         selector2 = lasso_selection.SelectFromCollection(axs[0], pts2)
         fig2.canvas.draw()
         fig.canvas.draw()
-
+def save_stab(_):
+    np.save(path + 'amp_stab.npy', amp_stab)
+    print('Stabilized data saved, length of the data:',len(amp_stab))
 axs[0].set_ylabel('Heat Amplitude Raw')
 axs[0].set_xlabel('Heat Baseline Raw')
 fig2.canvas.mpl_connect("key_press_event", accept)
 selector = lasso_selection.SelectFromCollection(axs2, pts)
+button.on_clicked(save_stab)
 plt.show()
