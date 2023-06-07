@@ -1,8 +1,11 @@
 import numpy as np
+import datetime
 def ntd_array(path):
     A=np.loadtxt(path)
     return A
-def get_path(i=4,j=1,peak=False):
+def get_path(i=3,j=2,peak=False):
+    j=1#input("file?")
+    j=int(j)
     filenum=i
     filebis=j
 
@@ -60,8 +63,8 @@ def get_path(i=4,j=1,peak=False):
             data_E = np.array([583.2, 911.204, 968.971, 2614.533])
             data_amp = np.array([147, 112, 154, 340])
         if filebis == 6:
-            data_E = np.array([911.204, 968.971, 2614.533, 583.2])
-            data_amp = np.array([48, 49.5, 127, 32.5])
+            data_E = np.array([583.2, 911.204, 968.971, 2614.533])
+            data_amp = np.array([63, 81, 85, 185])
         if filebis == 3:
             data_E = np.array([510.77, 583.191, 911.204, 968.971, 2614.533])
             data_amp = np.array([265, 323, 544, 586, 1692])
@@ -78,10 +81,21 @@ def get_path(i=4,j=1,peak=False):
         filename += name + '.ntp'
         filename_light = 0
         filename_trigheat = 0
-
-
-
-
+    if filenum == 5:
+        filename = 'LoggedData_2021_05_05_17_40_40.NTD_'
+        path = '/Users/mp274748/Documents/data_edi/'
+        if filebis == 0:
+            name = 'RAW'
+            data_E = [0, 0.1, 0.128]
+            data_amp = [0, 0.1, 0.128]
+        if filebis == 1:
+            name = 'DIF'
+            data_E = [0, 0.1, 0.128]
+            data_amp = [0, 0.1, 0.128]
+        path += name + '/'
+        filename += name + '.ntp'
+        filename_light = 0
+        filename_trigheat = 0
 
 
     print('file: '+filename)
@@ -91,7 +105,18 @@ def get_path(i=4,j=1,peak=False):
         z = np.polyfit(data_amp, data_E, 1)
         p = np.poly1d(z)
         return path, filename, filename_light, filename_trigheat,p
-
+def get_heat(path,filename,p):
+    peaks = ntd_array(path + filename)
+    amp_stab = np.load(path + 'amp_stab.npy')
+    E = p(amp_stab)
+    correlation = peaks[:, 5]
+    TV = peaks[:, 8]
+    riset = peaks[:, 11]
+    decayt = peaks[:, 12]
+    Sm = peaks[:, 9] / amp_stab
+    time = peaks[:,0]
+    print("acquisition duration(h:m:s):",str(datetime.timedelta(hours=np.round((peaks[-1,0]-peaks[0,0])/5000/60/60,2))))
+    return E,amp_stab,correlation,TV,riset,decayt,Sm,time
 if __name__=="__main__":
     arr=ntd_array(r'/Users/mp274748/Documents/20180709_23h07.BINLD.ntp')
     print(np.shape(arr))
