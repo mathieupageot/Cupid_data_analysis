@@ -3,29 +3,22 @@ import matplotlib.pyplot as plt
 import get_data
 from landaupy import langauss
 import gaussian_fit_light
-import datetime
+from cuts import f
+from matplotlib.widgets import Slider, RectangleSelector
+import lasso_selection
+from scipy.optimize import curve_fit
+def gauss(x, a, x0, sigma):
+    return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
-def gauss(x, h, a, x0, sigma):
-    return h + a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
-def get_heat(path,filename,p):
-    peaks = get_data.ntd_array(path + filename)
-    amp_stab = np.load(path + 'amp_stab.npy')
-    E = p(amp_stab)
-    correlation = peaks[:, 5]
-    TV = peaks[:, 8]
-    riset = peaks[:, 11]
-    decayt = peaks[:, 12]
-    Sm = peaks[:, 9] / amp_stab
-    print("acquisition duration(h:m:s):",str(datetime.timedelta(hours=np.round((peaks[-1,0]-peaks[0,0])/5000/60/60,2))))
-    return E,correlation,TV,riset,decayt,Sm
-
-def f(x, a, b, c):
-    return a * x ** b + c
 def f_tv(x, a, b, c):
     return np.exp((x - a) / b) * c
-
+def picker(fig):
+    def onpick(event):
+        ind = event.ind
+        print('onpick scatter:', time[ind]-3000)
+    fig.canvas.mpl_connect('pick_event', onpick)
 def plot_TV(E,TV,TV_cut,para_TV):
     fig1, axs1 = plt.subplots(1)
     axs1.scatter(E, TV, s=0.1)
@@ -38,13 +31,16 @@ def plot_TV(E,TV,TV_cut,para_TV):
     axs1.set_title('Energy vs TV')
 
 
-def plot_rise(E,riset):
+def plot_rise(E,riset,pick=0.3):
     fig5, ax5 = plt.subplots(1)
-    ax5.scatter(E, riset, s=0.1)
+    ax5.scatter(E, riset, s=0.1,picker=pick)
+
     ax5.set_ylim(-0.02,0.06)
     ax5.set_xlabel('Pulse energy in keV')
     ax5.set_ylabel('Rise time in s')
     ax5.set_title('Energy vs Rise Time')
+    if pick:
+        picker(fig5)
 def plot_decay(E,decayt):
     fig, ax = plt.subplots(1)
     ax.scatter(E, decayt, s=0.1)
@@ -101,7 +97,7 @@ def plot_Sm(E,Sm):
     ymean=np.mean(Sm)
     yvar=np.var(Sm)
     ax10.set_ylim(ymean-100*yvar,ymean+100*yvar)
-def hist_light_fit(amplt,filenum):
+def hist_light_fit(amplt,filename):
     fig4, axs4 = plt.subplots(1)
     popt, pcov, hist, bin_centers = gaussian_fit_light.binned_fit_langauss(amplt[amplt > 3400], bins='auto',
                                                                            nan='remove')
@@ -112,18 +108,19 @@ def hist_light_fit(amplt,filenum):
     axs4.set_ylabel("Counts/" + str(int((bin_centers[-1] - bin_centers[0]) / len(bin_centers)) + 1) + ' arbitrary units')
     axs4.set_title('Landeau fit of the light channel')
 
-    if filenum == 2:
+    if filename == '20180709_23h07.BINLD.ntp':
         amplt_fit = amplt * 100 / popt[0]
         ampl_fit = ampl * 100 / popt[0]
-        print('keV/ADU for light: ' + str(100 / popt[0]) + ' & error: ' + str(np.sqrt(pcov[0, 0])* 100 / popt[0]**2))
-    elif filenum == 3:
+        Emu = 100
+    elif filename == '20211125_00h43.BINLD21.2.ntp':
         amplt_fit = amplt * 260 / popt[0]
         ampl_fit = ampl * 260 / popt[0]
-        print('keV/ADU for light: ' + str(260 / popt[0]) + ' & error: ' + str(np.sqrt(pcov[0, 0])* 620 / popt[0]**2))
+        Emu = 260
     else:
         amplt_fit = amplt * 100 / popt[0]
         ampl_fit = ampl * 100 / popt[0]
-        print('keV/ADU for light: ' + str(100 / popt[0]) + ' & error: ' + str(np.sqrt(pcov[0, 0])* 100 / popt[0]**2))
+        Emu = 100
+    print("keV/ADU for light: {:.2e} & error: {:.2e}".format(Emu / popt[0], np.sqrt(pcov[0, 0]) * Emu / popt[0] ** 2))
     return amplt_fit, ampl_fit
 
 def hist_light(amplt_fit):
@@ -142,25 +139,85 @@ def plot_light(E_sel,ampl_fit):
     ax3.set_xlabel('Heat amplitude in keV')
     ax3.set_title('Heat amplitude VS Light amplitude for alpha discrimination')
     ax3.set_ylim(-5,5)
-def plot_LY(E_sel,LY):
-    fig11, ax11 = plt.subplots()
-    ax11.scatter(E_sel,LY,s=0.1)
+def plot_LY(E,LY):
+    fig11 = plt.figure()
+    ax11 = fig11.add_subplot(111)
+    left, bottom, width, height = 0.75, 0.75, 0.2, 0.2
+    ax12 = fig11.add_axes([left, bottom, width, height])
+    pts = ax11.scatter(E,LY,s=0.1)
     ax11.set_ylabel('LY ADU')
     ax11.set_xlabel('Heat amplitude in keV')
     ax11.set_title('Heat Energy vs LY')
     ymean=np.mean(LY)
     yvar=np.var(LY)
     ax11.set_ylim(ymean-yvar,ymean+yvar)
+    ax_slider = plt.axes([0.75, 0.65, 0.2, 0.03])
+    slider = Slider(ax_slider, 'bins', valmin=10, valmax=1000, valinit=100, valstep=1)
+    text_obj = ax11.text(0.8, 0.60, 'No parameters yet', fontsize=12, color='red', transform=ax11.transAxes)
+    # Create a box selection event handler
+    def line_select_callback(eclick, erelease):
+        'eclick and erelease are the press and release events'
+        x1, y1 = eclick.xdata, eclick.ydata
+        x2, y2 = erelease.xdata, erelease.ydata
+        print("(%3.2f, %3.2f) --> (%3.2f, %3.2f)" % (x1, y1, x2, y2))
+        toggle_selector.RS.set_active(True)
+        ax12.clear()
+        bool_LY= np.logical_and(LY<np.max((y1,y2)),LY>np.min((y1,y2)))
+        bool_E = np.logical_and(E<np.max((x1,x2)),E>np.min((x1,x2)))
+        selected_LY = LY[np.logical_and(bool_LY,bool_E)]
+        nbins = int(len(selected_LY)/50)+1
+        slider.valmin, slider.valmax, slider.valinit = nbins*0.1, nbins*10, nbins
+
+        n, bins = np.histogram(selected_LY, nbins)
+        center = (bins[:-1] + bins[1:]) / 2
+        hist, = ax12.plot(center, n, linewidth=.5, ds='steps-mid')
+        datax = np.linspace(selected_LY.min(),selected_LY.max(),1000)
+        popt, pcov = curve_fit(gauss, center, n, [n.max(), center.mean(), np.std(center)])
+        plot, = ax12.plot(datax,gauss(datax, *popt))
+        text_obj.set_text("$LY_0$ = {:.2e} \n$\sigma$ = {:.2e}".format(popt[1], popt[2]))
+
+
+
+        def update(_):
+            nbins = int(slider.val)
+            n, bins = np.histogram(selected_LY, nbins)
+            center = (bins[:-1] + bins[1:]) / 2
+            popt, pcov = curve_fit(gauss,center,n,[n.max(), center.mean(), np.std(center)])
+            plot.set_ydata(gauss(datax,*popt))
+            text_obj.set_text("$LY_0$ = {:.2e} \n$\sigma$ = {:.2e}".format(popt[1], popt[2]))
+            hist.set_xdata(center)
+            hist.set_ydata(n)
+            ax12.set_ylim(0,n.max()*1.01)
+            fig11.canvas.draw_idle()
+
+        slider.on_changed(update)
+        fig11.canvas.draw_idle()
+    def toggle_selector(event):
+        print(' Key pressed.')
+        if event.key in ['Q', 'q'] and toggle_selector.RS.active:
+            print(' RectangleSelector deactivated.')
+            toggle_selector.RS.set_active(False)
+        if event.key in ['A', 'a'] and not toggle_selector.RS.active:
+            print(' RectangleSelector activated.')
+
+    toggle_selector.RS = RectangleSelector(ax11, line_select_callback,
+                                           useblit=True,
+                                           button=[1, 3],  # don't use middle button
+                                           minspanx=5, minspany=5,
+                                           spancoords='pixels',
+                                           interactive=True)
+    plt.connect('key_press_event', toggle_selector)
+    selector = lasso_selection.SelectFromCollection(ax11, pts)
 
 if __name__ == '__main__':
     path, filename, filename_light, filename_trigheat, p= get_data.get_path()
-    E, correlation, TV, riset, decayt, Sm = get_heat(path, filename, p)
+    E, amp, correlation, TV, riset, decayt, Sm, time = get_data.get_heat(path, filename, p)
     try:
         para_corr = np.load(path+filename.strip(".ntp")+'_'+'correlation'+".npy")
     except FileNotFoundError:
         print('No correlation cut found')
         para_corr = np.array([-1,-1,0.80])
-    correl_cut = correlation > f(E,*para_corr)
+    correl_cut = correlation > f(amp,*para_corr)
     rise_cut = riset < 0.25
     sel = np.logical_and(correl_cut, rise_cut)
     try:
@@ -178,7 +235,7 @@ if __name__ == '__main__':
     hist_heat_cut(E, TV_cut, correl_cut)
     if filename_light != 0 :
         amplt, ampl = import_light(path, filename_trigheat, filename_light, sel)
-        amplt_fit, ampl_fit = hist_light_fit(amplt,filenum)
+        amplt_fit, ampl_fit = hist_light_fit(amplt,filename_light)
         LY = ampl_fit / E_sel
         plot_light(E_sel, ampl_fit)
         plot_LY(E_sel, LY)
