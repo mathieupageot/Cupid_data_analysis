@@ -79,15 +79,14 @@ def hist_heat_cut(E,TV_cut,correl_cut):
     axs2[2].set_ylabel('Counts/2 keV')
     for axis in axs2:
         axis.legend()
-def import_light(path ,filename_trigheat,filename_light,sel):
+def import_light(path ,filename_light):
+    peaksl = get_data.ntd_array(path + filename_light)
+    ampl = peaksl[:, 2]
+    return ampl
+def import_triglight(path ,filename_trigheat,sel):
     peaksl = get_data.ntd_array(path + filename_trigheat)
     ampl = peaksl[sel, 2]
-    peakslt = get_data.ntd_array(path + filename_light)
-    corlt = peakslt[:, 5]
-    sellt = corlt > 0.99
-    amplt = peakslt[sellt, 2]
-    return amplt,ampl
-
+    return ampl
 def plot_Sm(E,Sm):
     fig10, ax10 = plt.subplots()
     ax10.scatter(E, Sm, s=0.1)
@@ -97,31 +96,30 @@ def plot_Sm(E,Sm):
     ymean=np.mean(Sm)
     yvar=np.var(Sm)
     ax10.set_ylim(ymean-100*yvar,ymean+100*yvar)
-def hist_light_fit(amplt,filename):
+def hist_light_fit(ampl,filename_light):
     fig4, axs4 = plt.subplots(1)
-    popt, pcov, hist, bin_centers = gaussian_fit_light.binned_fit_langauss(amplt[amplt > 3400], bins='auto',
+    popt, pcov, hist, bin_centers = gaussian_fit_light.binned_fit_langauss(ampl[ampl > 0.1], bins='auto',
                                                                            nan='remove')
     axs4.plot(bin_centers, hist, linewidth=.5, ds='steps-mid')
     x_plot = np.linspace(bin_centers.min(), bin_centers.max(), 1000)
     axs4.plot(x_plot, langauss.pdf(x_plot, *popt))
     axs4.set_xlabel("Light amplitude in arbitrary unit")
-    axs4.set_ylabel("Counts/" + str(int((bin_centers[-1] - bin_centers[0]) / len(bin_centers)) + 1) + ' arbitrary units')
+    axs4.set_ylabel("Counts/{:.0e} arbitrary units".format((bin_centers[-1] - bin_centers[0]) / len(bin_centers)))
     axs4.set_title('Landeau fit of the light channel')
-
-    if filename == '20180709_23h07.BINLD.ntp':
-        amplt_fit = amplt * 100 / popt[0]
-        ampl_fit = ampl * 100 / popt[0]
+    if filename_light == '20180709_23h07.BINLD.ntp':
         Emu = 100
-    elif filename == '20211125_00h43.BINLD21.2.ntp':
-        amplt_fit = amplt * 260 / popt[0]
-        ampl_fit = ampl * 260 / popt[0]
+    elif filename_light == '20211125_00h43.BINLD21.2.ntp':
         Emu = 260
+    elif filename_light[:25] == '000004_20230606T192243_00':
+        Emu = 210
+        axs4.set_title('Landeau fit of the light channel '+filename_light[25])
+        if 'trig' in filename_light:
+            axs4.set_title("Landeau fit of the light channel {} using crossing muons ".format(filename_light[25]))
     else:
-        amplt_fit = amplt * 100 / popt[0]
-        ampl_fit = ampl * 100 / popt[0]
         Emu = 100
+    axs4.text(0.6, 0.60, "Parameter of the fit :\n$x_{{MPV}}$ : {:.2e}\nξ : {:.2e}\n$\sigma$ : {:.2e}".format(*popt), fontsize=12, color='red', transform=axs4.transAxes)
     print("keV/ADU for light: {:.2e} & error: {:.2e}".format(Emu / popt[0], np.sqrt(pcov[0, 0]) * Emu / popt[0] ** 2))
-    return amplt_fit, ampl_fit
+    return Emu / popt[0]
 
 def hist_light(amplt_fit):
     fig7, ax7 = plt.subplots()
@@ -211,33 +209,38 @@ def plot_LY(E,LY):
 
 if __name__ == '__main__':
     path, filename, filename_light, filename_trigheat, p= get_data.get_path()
-    E, amp, correlation, TV, riset, decayt, Sm, time = get_data.get_heat(path, filename, p)
-    try:
-        para_corr = np.load(path+filename.strip(".ntp")+'_'+'correlation'+".npy")
-    except FileNotFoundError:
-        print('No correlation cut found')
-        para_corr = np.array([-1,-1,0.80])
-    correl_cut = correlation > f(amp,*para_corr)
-    rise_cut = riset < 0.25
-    sel = np.logical_and(correl_cut, rise_cut)
-    try:
-        para_TV = np.load(path+filename.strip(".ntp")+'_'+'TV'+".npy")
-    except FileNotFoundError:
-        print('No TV cut found')
-        para_TV = np.array([4,4,1])
-    TV_cut = f(E, *para_TV) > TV
-    E_sel = E[sel]
-    plot_TV(E,TV,TV_cut,para_TV)
-    plot_rise(E, riset)
-    plot_decay(E, decayt)
-    plot_corr(E, correlation,para_corr)
-    plot_Sm(E, Sm)
-    hist_heat_cut(E, TV_cut, correl_cut)
+    if filename != 0:
+        E, amp, correlation, TV, riset, decayt, Sm, time = get_data.get_heat(path, filename, p)
+        try:
+            para_corr = np.load(path+filename.strip(".ntp")+'_'+'correlation'+".npy")
+        except FileNotFoundError:
+            print('No correlation cut found')
+            para_corr = np.array([-1,-1,0.80])
+        correl_cut = correlation > f(amp,*para_corr)
+        rise_cut = riset < 0.25
+        sel = np.logical_and(correl_cut, rise_cut)
+        try:
+            para_TV = np.load(path+filename.strip(".ntp")+'_'+'TV'+".npy")
+        except FileNotFoundError:
+            print('No TV cut found')
+            para_TV = np.array([4,4,1])
+        TV_cut = f(E, *para_TV) > TV
+        E_sel = E[sel]
+        plot_TV(E,TV,TV_cut,para_TV)
+        plot_rise(E, riset)
+        plot_decay(E, decayt)
+        plot_corr(E, correlation,para_corr)
+        plot_Sm(E, Sm)
+        hist_heat_cut(E, TV_cut, correl_cut)
     if filename_light != 0 :
-        amplt, ampl = import_light(path, filename_trigheat, filename_light, sel)
-        amplt_fit, ampl_fit = hist_light_fit(amplt,filename_light)
-        LY = ampl_fit / E_sel
-        plot_light(E_sel, ampl_fit)
+        ampl = import_light(path,filename_light)
+        coeff_light = hist_light_fit(ampl,filename_light)
+        ampl_fit = ampl * coeff_light
+    if filename_trigheat != 0 :
+        amplt = import_triglight(path, filename_trigheat, sel)
+        amplt_fit = amplt * coeff_light
+        LY = amplt_fit / E_sel
+        plot_light(E_sel, amplt_fit)
         plot_LY(E_sel, LY)
 
     plt.show()
