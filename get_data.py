@@ -3,8 +3,8 @@ import datetime
 def ntd_array(path):
     A=np.loadtxt(path)
     return A
-def get_path(i=3,j=2,peak=False):
-    j=1#input("file?")
+def get_path(i=6,j=2,peak=False):
+    j=input("file?")
     j=int(j)
     filenum=i
     filebis=j
@@ -81,6 +81,7 @@ def get_path(i=3,j=2,peak=False):
         filename += name + '.ntp'
         filename_light = 0
         filename_trigheat = 0
+    #data from edi
     if filenum == 5:
         filename = 'LoggedData_2021_05_05_17_40_40.NTD_'
         path = '/Users/mp274748/Documents/data_edi/'
@@ -96,9 +97,31 @@ def get_path(i=3,j=2,peak=False):
         filename += name + '.ntp'
         filename_light = 0
         filename_trigheat = 0
+    #data form RUN96 measurement 2
+    if filenum == 6 :
+        if filebis == 54:
+            filename_light = '000004_20230606T192243_005_trig4.ntp'
+            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/trig4/'
+        elif filebis == 64:
+            filename_light = '000004_20230606T192243_006_trig4.ntp'
+            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/trig4/'
+        else:
+            filename_light = '000004_20230606T192243_00'+str(filebis)+'_001.bin.ntp'
+            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/channel'+str(filebis)+'/'
+        filename = 0
+        filename_trigheat = 0
+        data_E = [0,1,2]
+        data_amp = data_E
 
+    try :
+        print('file: '+filename)
 
-    print('file: '+filename)
+    except TypeError:
+        try :
+            print('file: ' + filename_light)
+        except TypeError :
+            print('No file found')
+
     if peak:
         return path,filename,filename_light,filename_trigheat,np.sort(data_E),np.sort(data_amp)
     else:
