@@ -1,20 +1,49 @@
 import numpy as np
 import datetime
-def ntd_array(path):
-    A=np.loadtxt(path)
-    return A
-def get_path(i=6,j=2,peak=False):
-    j=input("file?")
-    j=int(j)
-    filenum=i
-    filebis=j
+import json
 
-    if i == 3: #measurement 0003
+
+def ntd_array(path):
+    print(path)
+    A = np.loadtxt(path, usecols=(n for n in range(20)))
+    return A
+
+
+def load_dict(dict_path):
+    with open(dict_path, 'r') as json_file:
+        dict = json.load(json_file)
+    return dict
+
+
+def update_dict(dict_path, key, value):
+    with open(dict_path, 'r') as json_file:
+        data = json.load(json_file)
+    try:
+        value = value.tolist()
+    except:
+        pass
+    data[key] = value
+    with open(dict_path, 'w') as json_file:
+        json.dump(data, json_file, indent=4)
+def get_values(dictionary,key_list):
+    value_set = []
+    for key in key_list:
+        if key in dictionary:
+            print(dictionary[key])
+            value_set.append(dictionary[key])
+    return value_set
+
+def get_path(i=7, j=1, peak=False):
+    # input("file?")
+    j = int(j)
+    filenum = i
+    filebis = j
+
+    if i == 3:  # measurement 0003
         path = '/Users/mp274748/Documents/data_arg/second_set/'
         filename = '20211125_00h43.BINLMO21.2.ntp'
         filename_light = '20211125_00h43.BINLD21.2.ntp'
         filename_trigheat = '20211125_00h43.BINLD21.2_trigheat.ntp'
-
     if i == 2:
         path = '/Users/mp274748/Documents/data_arg/first_set2/'
         filename = '20180709_23h07.BINLMO.ntp'
@@ -44,61 +73,26 @@ def get_path(i=6,j=2,peak=False):
             name = '61b_UV1'
         elif j == 8:
             name = '61b_UV2'
-        else :
+        else:
             name = ''
-    if filenum == 2:
-        data_E = np.array([352, 609, 295, 242])
-        data_amp = np.array([1114, 640, 537, 433])
-    if filenum == 3:
-        data_E = np.array([352, 609, 768, 1120, 1238, 1764])
-        data_amp = np.array([145, 319, 502, 246, 460, 714])
-    if filenum == 4:
-        if filebis == 1:
-            data_E = np.array([510.77, 583.2, 609.312, 911.204, 2614.533])
-            data_amp = np.array([254, 298, 313, 472, 1362])
-        if filebis == 2:
-            data_E = np.array([510.77, 583.2, 609.312, 911.204, 2614.533])
-            data_amp = np.array([274, 313, 335, 572, 1822])
-        if filebis == 5:
-            data_E = np.array([583.2, 911.204, 968.971, 2614.533])
-            data_amp = np.array([147, 112, 154, 340])
-        if filebis == 6:
-            data_E = np.array([583.2, 911.204, 968.971, 2614.533])
-            data_amp = np.array([63, 81, 85, 185])
-        if filebis == 3:
-            data_E = np.array([510.77, 583.191, 911.204, 968.971, 2614.533])
-            data_amp = np.array([265, 323, 544, 586, 1692])
-        if filebis == 4:
-            data_E = np.array([583.191, 609.312, 911.204, 968.971, 2614.533])
-            data_amp = np.array([61.4, 63, 84.6, 88.2, 207])
-        if filebis == 7:
-            data_E = np.array([510.77, 609.312, 583.191, 911.204, 968.971, 2614.533])
-            data_amp = np.array([164, 183, 198, 318, 350, 1006])
-        if filebis == 8:
-            data_E = np.array([583.191, 911.204, 968.971, 2614.533])
-            data_amp = np.array([93, 141, 151, 384])
         path += name + '/'
         filename += name + '.ntp'
         filename_light = 0
         filename_trigheat = 0
-    #data from edi
+    # data from edi
     if filenum == 5:
         filename = 'LoggedData_2021_05_05_17_40_40.NTD_'
         path = '/Users/mp274748/Documents/data_edi/'
         if filebis == 0:
             name = 'RAW'
-            data_E = [0, 0.1, 0.128]
-            data_amp = [0, 0.1, 0.128]
         if filebis == 1:
             name = 'DIF'
-            data_E = [0, 0.1, 0.128]
-            data_amp = [0, 0.1, 0.128]
         path += name + '/'
         filename += name + '.ntp'
         filename_light = 0
         filename_trigheat = 0
-    #data form RUN96 measurement 2
-    if filenum == 6 :
+    # data form RUN96 measurement 2
+    if filenum == 6:
         if filebis == 54:
             filename_light = '000004_20230606T192243_005_trig4.ntp'
             path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/trig4/'
@@ -106,40 +100,67 @@ def get_path(i=6,j=2,peak=False):
             filename_light = '000004_20230606T192243_006_trig4.ntp'
             path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/trig4/'
         else:
-            filename_light = '000004_20230606T192243_00'+str(filebis)+'_001.bin.ntp'
-            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/channel'+str(filebis)+'/'
+            filename_light = '000004_20230606T192243_00' + str(filebis) + '_001.bin.ntp'
+            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/channel' + str(filebis) + '/'
         filename = 0
         filename_trigheat = 0
-        data_E = [0,1,2]
-        data_amp = data_E
-
-    try :
-        print('file: '+filename)
-
+    # data form RUN96 measurement 6
+    if filenum == 7:
+        path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement6/'
+        if filebis == 0:
+            path += 'LMO18/'
+            filename = '000015_20230609T235012_008.ntp'
+            filename_light = '000015_20230609T235012_001_bis.ntp'
+            filename_trigheat = '000015_20230609T235012_001_trig.ntp'
+        elif filebis == 1:
+            path += 'LMO26/'
+            filename = '000015_20230609T235012_007.ntp'
+            filename_light = '000015_20230609T235012_002.ntp'
+            filename_trigheat = '000015_20230609T235012_002_trig.ntp'
+    try:
+        print('file: ' + filename)
     except TypeError:
-        try :
+        try:
             print('file: ' + filename_light)
-        except TypeError :
+        except TypeError:
             print('No file found')
 
-    if peak:
-        return path,filename,filename_light,filename_trigheat,np.sort(data_E),np.sort(data_amp)
-    else:
-        z = np.polyfit(data_amp, data_E, 1)
-        p = np.poly1d(z)
-        return path, filename, filename_light, filename_trigheat,p
-def get_heat(path,filename,p):
+    dict = {"path": path, "filename": filename, "filename_light": filename_light,
+            "filename_trigheat": filename_trigheat}
+    try :
+        for key, value in zip(dict.keys(), dict.values()):
+            update_dict(path + "dictionary.json", key, value)
+    except FileNotFoundError:
+        with open(path + "dictionary.json", 'w') as json_file:
+            json.dump(dict, json_file)
+    dictionary = load_dict(path + "dictionary.json")
+    return path, dictionary
+
+
+def get_heat(path, filename, p, dict):
+    from stabilize import function_stabilize
     peaks = ntd_array(path + filename)
-    amp_stab = np.load(path + 'amp_stab.npy')
+    try:
+        stabparam, meanvalue = dict["stabilisation"]
+        amp_stab = function_stabilize(peaks[:, 2], peaks[:, 3], stabparam, meanvalue)
+    except:
+        amp_stab = np.load(path + 'amp_stab.npy')
     E = p(amp_stab)
     correlation = peaks[:, 5]
     TV = peaks[:, 8]
     riset = peaks[:, 11]
     decayt = peaks[:, 12]
     Sm = peaks[:, 9] / amp_stab
-    time = peaks[:,0]
-    print("acquisition duration(h:m:s):",str(datetime.timedelta(hours=np.round((peaks[-1,0]-peaks[0,0])/5000/60/60,2))))
-    return E,amp_stab,correlation,TV,riset,decayt,Sm,time
-if __name__=="__main__":
-    arr=ntd_array(r'/Users/mp274748/Documents/20180709_23h07.BINLD.ntp')
-    print(np.shape(arr))
+    time = peaks[:, 0]
+    print("acquisition duration(h:m:s):",
+          str(datetime.timedelta(hours=np.round((peaks[-1, 0] - peaks[0, 0]) / 5000 / 60 / 60, 2))))
+    return E, amp_stab, correlation, TV, riset, decayt, Sm, time
+
+
+def import_light(path, filename_light):
+    peaksl = ntd_array(path + filename_light)
+    correlation = peaksl[:, 5]
+    sel_corr = correlation>0.95
+    ampl = peaksl[sel_corr, 2]
+    riset = peaksl[sel_corr, 11]
+    return ampl,riset
