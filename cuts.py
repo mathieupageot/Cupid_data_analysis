@@ -1,16 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import lasso_selection
 from matplotlib.widgets import Slider
 from matplotlib.widgets import Button
 
+import dictionary_handler
 import get_data
-from scipy.optimize import curve_fit
-
 
 
 def cut_function(x, a, b, c, x0=0):
-    return a * (x-x0) ** b + c
+    positive = x>0
+    y=np.ones_like(x)*2
+    y[positive] = a * np.power(x[positive]-x0, b) + c
+    return y
+
 def plot_cutTV(ax,TV,amp,a0,b0,c0):
     cut = cut_function(amp, a0, b0, c0) > TV
     pts = ax.scatter(amp, TV, s=0.1)
@@ -29,8 +31,8 @@ def plot_cutcorr(ax,correlation,amp,a0,b0,c0,x0,axa,axb,axc,ax0):
     ax.set_xlabel('Amplitude in arbitrary unit')
     ax.set_ylabel('Correlation')
     ax.set_title('Energy vs correlation')
-    ax.set_ylim(0.99,1)
-    sa = Slider(axa, 'a', 10*a0, 0, valinit=a0)
+    ax.set_ylim(0.90,1)
+    sa = Slider(axa, 'a', 2*a0, 0, valinit=a0)
     sb = Slider(axb, 'b', 2*b0, 0, valinit=b0)
     sc = Slider(axc, 'c', 0.9, 1.1, valinit=c0)
     s0 = Slider(ax0, 'x0', -5., +5., valinit=x0)
@@ -46,7 +48,7 @@ def hist_plot(amp,cut,axs2,fig):
     return hist
 
 
-def plot_hist(amp,para_cut,path, correlation,cut_name = 'correlation'):
+def get_cut_para(amp, para_cut, path, correlation, cut_name ='correlation'):
     fig, ax = plt.subplots()
     plt.subplots_adjust(left=0.30, bottom=0.30)
 
@@ -88,8 +90,8 @@ def plot_hist(amp,para_cut,path, correlation,cut_name = 'correlation'):
         b = sb.val
         c = sc.val
         x0 = s0.val
-        get_data.update_dict(path + "dictionary.json", cut_name,[a, b, c,x0])
-        print(a, b, c, x0)
+        dictionary_handler.update_dict(path + "dictionary.json", {cut_name: [a, b, c, x0]})
+        print('cut parameters saved')
 
 
     sa.on_changed(update)
@@ -105,19 +107,14 @@ def plot_hist(amp,para_cut,path, correlation,cut_name = 'correlation'):
     plt.show()
 
 if __name__=="__main__":
-    from stabilize import get_amp_stabilize
     path, dictionary = get_data.get_path()
-    print(dictionary)
-    filename = dictionary["filename"]
-    peaks = get_data.ntd_array(path + filename)
-    amplitude = get_amp_stabilize(dictionary,peaks)
-    correlation = peaks[:, 5]
-    TV = peaks[:, 8]  # parabolic cut
+    amplitude, correlation = get_data.get_pulses(dictionary,['amp_stab','Correlation'])
+    #amplitude, correlation = get_data.get_pulses(dictionary, ['Amplitude_filtered', 'Correlation'], type='light')
     try:
         para_correlation = dictionary['correlation']
         print('cut from dictionary')
     except KeyError:
-        para_correlation = np.array([-1, -1, 0.80, 0])
+        para_correlation = np.array([-0.001, -1, 0.95, 1.e-5])
         print('no correlation cut found')
-
-    plot_hist(amplitude[amplitude<0.3], para_correlation, path,correlation[amplitude<0.3])
+    amp_max = dictionary["mean_pulse_max"]
+    get_cut_para(amplitude[amplitude < amp_max], para_correlation, path, correlation[amplitude < amp_max])

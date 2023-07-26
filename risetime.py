@@ -1,14 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from matplotlib.widgets import Button
+import dictionary_handler
+def linear(x, a, b):
+    return a * x +b
 
 
 def gaussian(x, a, x0, sigma):
     return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
-def sigma_function(x, a, b, c, d):
-    return a * x ** b + c + d*x
+def sigma_function(x, a, b, c):
+    return a * x ** b + c
 
 def gaussians_from_scatter(x_scat,y_scat,events_per_interval=500):
     # Calculate the x-interval size
@@ -24,7 +28,7 @@ def gaussians_from_scatter(x_scat,y_scat,events_per_interval=500):
     popts = []
     pcovs = []
     interval_centers = []
-    fig2,ax2 = plt.subplots(3,3)
+    #fig2,ax2 = plt.subplots(3,3)
     # Iterate over partitions
     for i,(x_interval, y_interval) in enumerate(zip(x_intervals,y_intervals)):
         center = np.mean(x_interval)
@@ -35,7 +39,7 @@ def gaussians_from_scatter(x_scat,y_scat,events_per_interval=500):
             popt, pcov = curve_fit(gaussian, bins_center, hist, [hist.max(), y_interval.mean(), np.std(y_interval)])
         except RuntimeError:
             popt, pcov = np.zeros(3), np.zeros((3,3))
-        if i<9:
+        if i<-1:
             x_plot=np.linspace(popt[1]-5*popt[2],popt[1]+5*popt[2],1000)
             ax2[i//3,i%3].plot(bins_center,hist,linewidth=.5, ds='steps-mid')
             ax2[i // 3, i % 3].plot(x_plot,gaussian(x_plot,*popt))
@@ -47,45 +51,57 @@ def gaussians_from_scatter(x_scat,y_scat,events_per_interval=500):
         pcovs.append(pcov)
     return np.array(popts), np.array(pcovs), interval_centers
 
-def plot_scatter_with_gauss(x_scat,y_scat,ax_scatter,num_partitions = 5):
+def get_risetime(x_scat, y_scat, ax_scatter, num_partitions = 5):
     mean_y_scat = np.mean(y_scat)
     std_y_scat = np.std(y_scat)
     sel_y = np.logical_and(y_scat<mean_y_scat+10*std_y_scat,y_scat>mean_y_scat-10*std_y_scat)
     x_scat, y_scat = x_scat[sel_y],y_scat[sel_y]
-    ax_scatter.scatter(x_scat, y_scat, s=0.1,c='b')
+    scatter_data = ax_scatter.scatter(x_scat, y_scat, s=0.1,c='b')
     popts, pcovs, interval_centers = gaussians_from_scatter(x_scat,y_scat,num_partitions)
-    sigmas = popts[:,2]
+    n_min_fit = 8
+    n_lin_fit = num_partitions-20
+    interval_centers = np.array(interval_centers[n_min_fit:])
+    sigmas = popts[n_min_fit:,2]
     sigmas = np.abs(sigmas)
-    y0s = popts[:,1]
-    ax_scatter.scatter(interval_centers,y0s,c='g',s=10, label='mean value')
+    y0s = np.array(popts[n_min_fit:,1])
+    y0s_error = np.sqrt(pcovs[n_min_fit:,1,1]).reshape(-1)
+    ax_scatter.scatter(interval_centers,y0s,c='y',s=10, label='mean value')
     ax_scatter.scatter(interval_centers, y0s+5*sigmas, c='r',s=10)
     ax_scatter.scatter(interval_centers, y0s-5*sigmas, c='r',s=10)
-    x_fit, y_fit = interval_centers,y0s+5*sigmas
-    y_fit_bis = y0s-5*sigmas
-    p_guess = [x_fit[0]*y_fit[0],-1,y0s[0],0]
-
     x_plot = np.linspace(x_scat.min(),x_scat.max(),3000)
-    try :
-        popt_sigma, pcov_sigma = curve_fit(sigma_function, x_fit, y_fit, p_guess)
-    except RuntimeError:
-        popt_sigma = p_guess
-    p_guess_bis = [-popt_sigma[0], popt_sigma[1], 2 * y0s.mean() - popt_sigma[2],0]
-    try :
-        popt_sigma_bis,_= curve_fit(sigma_function, x_fit, y_fit_bis, p_guess_bis)
-    except RuntimeError:
-        popt_sigma_bis = p_guess_bis
-    ax_scatter.plot(x_plot,sigma_function(x_plot,*popt_sigma),c='r',label = '5$\sigma$ interval')
-    ax_scatter.plot(x_plot, sigma_function(x_plot, *popt_sigma_bis), c='r')
-    ax_scatter.text(0.5, 0.60,"mean Rise time = {:.2e} ms".format(y0s.mean()*1000),bbox=dict(facecolor='white', edgecolor='white'), fontsize=12, color='black', transform=ax_scatter.transAxes,verticalalignment='top')
-    lin_para,_ = curve_fit(lambda x,a,b : a * x +b ,interval_centers, y0s,[0,y0s.mean()])
-    print(popt_sigma)
+    lin_para, lin_cov = curve_fit(linear, interval_centers, y0s,sigma=y0s_error)
     print(lin_para)
-    ax_scatter.plot([0,300],lin_para[0]*np.array([0,300])+lin_para[1])
+    y1s = y0s / linear(interval_centers, *lin_para)
+    sigma1s = sigmas / linear(interval_centers, *lin_para)
+    y_fit = y0s + 5 * sigma1s
+    bool_sigma_fit=0
+    if bool_sigma_fit == 1:
+        guess = [interval_centers[0] * y_fit[0], -1, 0]
+        popt_sigma, _ = curve_fit(sigma_function, interval_centers[-n_lin_fit:],
+                                  y1s[-n_lin_fit:] + 5 * sigma1s[-n_lin_fit:], p0=guess)
+        popt_sigma_bis = [-popt_sigma[0], popt_sigma[1], 2 - popt_sigma[2]]
+        ax_scatter.plot(x_plot, sigma_function(x_plot, *popt_sigma)*linear(x_plot,*lin_para), c='r', label='5$\sigma$ interval')
+        ax_scatter.plot(x_plot, sigma_function(x_plot, *popt_sigma_bis)*linear(x_plot,*lin_para), c='r')
+    ax_scatter.text(0.75, 0.80, "Rise time at 300keV = {:.2e} ms".format(linear(300,*lin_para)),
+                    bbox=dict(facecolor='white', edgecolor='white'), fontsize=12, color='black',
+                    transform=ax_scatter.transAxes, verticalalignment='top')
+
+    ax_scatter.plot(x_plot,linear(x_plot,*lin_para),c='y')
     ax_scatter.set_xlabel("Energy in keV")
     ax_scatter.set_ylabel("Rise time in s")
-    ax_scatter.set_title('Energy vs Rise time for light detector channel 2')
+    ax_scatter.set_title("Energy vs Rise time for light detector channel {}".format(int(dictionary['channel'])))
     fig = ax_scatter.get_figure()
     fig.legend()
+    def safe_calib(_):
+        dictio_update = {'rise_time_fit': list(lin_para), 'rise_time_fit_error':list(np.sqrt(np.diag(lin_cov)))}
+        dictionary_handler.update_dict(path + "dictionary.json",
+                                       dictio_update)
+        print('saved')
+    save_button_ax = fig.add_axes([0.92, 0.05, 0.05, 0.1])  # Define button axes coordinates
+    save_button = Button(save_button_ax, 'Save')
+    save_button.on_clicked(safe_calib)
+    plt.show()
+    return scatter_data
 
 if __name__ == "__main__":
     import matplotlib.pylab as pylab
@@ -97,20 +113,13 @@ if __name__ == "__main__":
               'ytick.labelsize': 20.}
     pylab.rcParams.update(params)
     import get_data
-    path, dictionary = get_data.get_path()
-    print(dictionary)
-    filename, filename_light, filename_trigheat = get_data.get_values(dictionary,
-                                                                                     ["filename", "filename_light",
-                                                                                      "filename_trigheat" ])
-    ampl, risetl = get_data.import_light(path, filename_light)
-    coeff_light, error_coeff_light = dictionary["light_calib"]
-    ampl_fit = ampl * coeff_light
+    path, dictionary = get_data.get_path(9,2)
+    ampl_fit, risetl = get_data.get_pulses(dictionary, ['Energy', 'Rise_time'],type='light')
+    #ampl_fit, risetl = get_data.get_pulses(dictionary, ['Energy', 'Rise_time'], type='heat')
     sel_rt = risetl<1
-    ampl_fit, risetl = ampl_fit[sel_rt], risetl[sel_rt]
+    ampl_fit, risetl = ampl_fit[sel_rt], 1000* risetl[sel_rt]
     fig, ax = plt.subplots()
-    Energy_max = 150
-    plot_scatter_with_gauss(ampl_fit[ampl_fit<Energy_max],risetl[ampl_fit<Energy_max],ax,len(ampl_fit[ampl_fit<Energy_max])//30)
-    #ax.scatter(ampl_fit,risetl,s=0.1)
-    #ax.hist(ampl_fit,1000)
+    Energy_max = 400
+    get_risetime(ampl_fit[ampl_fit < Energy_max], risetl[ampl_fit < Energy_max], ax, len(ampl_fit[ampl_fit < Energy_max]) // 30)
     plt.show()
 

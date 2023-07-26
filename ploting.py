@@ -1,10 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import get_data
 from cuts import cut_function
-import risetime
-from matplotlib.widgets import Slider, RectangleSelector
+from matplotlib.widgets import Slider, RectangleSelector, Button
 from scipy.optimize import curve_fit
+
 
 def change_frontsize(axes,frontsize):
     for ax in axes:
@@ -20,16 +19,15 @@ def double_gaussian(x, amp1, center1, sigma1, amp2, center2, sigma2):
     gaussian1 = amp1 * np.exp(-(x - center1)**2 / (2 * sigma1**2))
     gaussian2 = amp2 * np.exp(-(x - center2)**2 / (2 * sigma2**2))
     return gaussian1 + gaussian2
+
+
 gaussian_dict = {'single' : gaussian, 'double' : double_gaussian}
+
 
 def f_tv(x, a, b, c):
     return np.exp((x - a) / b) * c
-def picker(ax):
-    fig = ax.get_figure()
-    def onpick(event):
-        ind = event.ind
-        print('onpick scatter:', time[ind]-3000)
-    fig.canvas.mpl_connect('pick_event', onpick)
+
+
 def plot_TV(E,TV,TV_cut,para_TV,ax):
     ax.scatter(E, TV, s=0.1)
     ax.scatter(E[TV_cut], TV[TV_cut], s=0.1)
@@ -42,11 +40,13 @@ def plot_TV(E,TV,TV_cut,para_TV,ax):
 
 
 def plot_rise(E, riset, ax):
-    risetime.plot_scatter_with_gauss(E[E<20],riset[E<20],ax,len(E)//30)
-    ax.set_ylim(-0.02,0.06)
+    #risetime.plot_scatter_with_gauss(E[E<20],riset[E<20],ax,len(E)//30)
+    scat = ax.scatter(E,1000*riset,s=0.1)
+    ax.set_ylim(-20,60)
     ax.set_xlabel('Pulse energy in keV')
-    ax.set_ylabel('Rise time in s')
+    ax.set_ylabel('Rise time in ms')
     ax.set_title('Energy vs Rise Time')
+    return scat
 
 
 def plot_decay(E,decayt,ax):
@@ -56,7 +56,7 @@ def plot_decay(E,decayt,ax):
     ax.set_ylabel('Decay time in s')
     ax.set_title('Energy vs Decay Time')
 def plot_corr(E,correlation,para,ax):
-    ax.scatter(E, correlation, s=0.1)
+    scat = ax.scatter(E, correlation, s=0.1)
     ax.set_ylim(0.98, 1.)
     xcor = np.linspace(E.min(), E.max(), 5000)
     ax.plot(xcor, cut_function(xcor, *para), c='r', label='correlation cut')
@@ -76,11 +76,6 @@ def hist_heat_cut(E, correl_cut, ax):
     ax.legend()
 
 
-def import_triglight(path ,filename_trigheat,sel):
-    peaksl = get_data.ntd_array(path + filename_trigheat)
-    ampl = peaksl[sel, 2]
-    trig_rt = peaksl[sel, 11]
-    return ampl, trig_rt
 def plot_Sm(E,Sm,ax):
     ax.scatter(E, Sm, s=0.1)
     ax.set_xlabel('Amplitude in keV')
@@ -107,37 +102,50 @@ def plot_light(E_sel,ampl_fit,ax):
     ax.set_ylim(-5,5)
 
 
-def plot_LY(E,LY,ax, axfit):
+class Clicker:
+    def __init__(self,x,y):
+        self.xdata = x
+        self.ydata = y
+
+
+def plot_LY(E,LY,ax, axfit, dictionary):
+    clic = Clicker(3500,-0.2)
+    release = Clicker(6500,0.6)
+    path = dictionary['path']
+    nbins = 100
     fig = ax.get_figure()
     pts = ax.scatter(E,LY,s=0.1)
-    ax.set_ylabel('LY ADU')
+    ax.set_ylabel('Light Yield in keV/MeV')
     ax.set_xlabel('Heat amplitude in keV')
-    ax.set_title('Heat Energy vs LY for {}'.format(path.split("/")[-2]))
-    ymean=np.mean(LY)
-    yvar=np.var(LY)
-    ax.set_ylim(ymean-yvar,ymean+yvar)
-    ax_slider = plt.axes([0.75, 0.65, 0.2, 0.03])
-    slider = Slider(ax_slider, 'bins', valmin=10, valmax=1000, valinit=100, valstep=1)
-    text_parameters = ax.text(0.8, 0.53, 'No parameters yet', fontsize=12, bbox=dict(facecolor='white', edgecolor='white'),color='black', transform=ax.transAxes,verticalalignment='top')
+    ax.set_xlim(-100,7000)
+    ax.set_title('Heat Energy vs Light Yield for {}'.format(path.split("/")[-2]))
+    ax.set_ylim(np.percentile(LY, 5),np.percentile(LY, 80))
+    ax_slider = fig.add_axes([0.92, 0.20, 0.01, 0.6])
+    slider = Slider(ax_slider, 'bins', valmin=10, valmax=1000, valinit=nbins, valstep=1, orientation="vertical")
+    text_parameters = ax.text(0.5, 0.83, 'No parameters yet', fontsize=12, bbox=dict(facecolor='white', edgecolor='white'),color='black', transform=ax.transAxes,verticalalignment='top')
     gaussian_type_fit = 'single'
-    text_gaussian_type = ax.text(0.8, 0.60, "gaussian type : "+gaussian_type_fit,bbox=dict(facecolor='white', edgecolor='white'), fontsize=12, color='black', transform=ax.transAxes,verticalalignment='top')
+    text_gaussian_type = ax.text(0.5, 0.90, "gaussian type : "+gaussian_type_fit,bbox=dict(facecolor='white', edgecolor='white'), fontsize=12, color='black', transform=ax.transAxes,verticalalignment='top')
     # Create a box selection event handler
+    discrimination_power = None
+    popt, pcov = None, None
     def line_select_callback(eclick, erelease):
+        nonlocal discrimination_power
+        nonlocal popt
+        nonlocal pcov
         'eclick and erelease are the press and release events'
         x1, y1 = eclick.xdata, eclick.ydata
         x2, y2 = erelease.xdata, erelease.ydata
-        print("(%3.2f, %3.2f) --> (%3.2f, %3.2f)" % (x1, y1, x2, y2))
+        #print("(%3.2f, %3.2f) --> (%3.2f, %3.2f)" % (x1, y1, x2, y2))
         toggle_selector.RS.set_active(True)
         axfit.clear()
         bool_LY= np.logical_and(LY<np.max((y1,y2)),LY>np.min((y1,y2)))
         bool_E = np.logical_and(E<np.max((x1,x2)),E>np.min((x1,x2)))
         selected_LY = LY[np.logical_and(bool_LY,bool_E)]
-        nbins = int(len(selected_LY)/50)+1
-        slider.valmin, slider.valmax, slider.valinit = nbins*0.1, nbins*10, nbins
+        nonlocal nbins
 
         n, bins = np.histogram(selected_LY, nbins)
         center = (bins[:-1] + bins[1:]) / 2
-        hist, = axfit.plot(center, n, linewidth=.5, ds='steps-mid')
+        hist, = axfit.plot(n ,center, linewidth=.5, ds='steps-mid')
         datax = np.linspace(selected_LY.min(),selected_LY.max(),1000)
         if gaussian_type_fit == 'single':
 
@@ -156,11 +164,15 @@ def plot_LY(E,LY,ax, axfit):
                                    initial_guess)
             discrimination_power = np.absolute(popt[1]-popt[4])/np.sqrt(popt[2]**2+popt[5]**2)
             text_parameters.set_text("$LY_01$ = {:.2e} \n$\sigma1$ = {:.2e}\n$LY_02$ = {:.2e} \n$\sigma2$ = {:.2e}\nDiscrimination Power = {:.2e}".format(popt[1], popt[2],popt[4], popt[5],discrimination_power))
-        plot, = axfit.plot(datax,gaussian_dict[gaussian_type_fit](datax, *popt))
+        plot, = axfit.plot(gaussian_dict[gaussian_type_fit](datax, *popt),datax)
 
 
 
         def update(_):
+            nonlocal discrimination_power
+            nonlocal nbins
+            nonlocal popt
+            nonlocal pcov
             nbins = int(slider.val)
             n, bins = np.histogram(selected_LY, nbins)
             center = (bins[:-1] + bins[1:]) / 2
@@ -182,16 +194,17 @@ def plot_LY(E,LY,ax, axfit):
                 text_parameters.set_text(
                     "$LY_01$ = {:.2e} \n$\sigma1$ = {:.2e}\n$LY_02$ = {:.2e} \n$\sigma2$ = {:.2e}\nDiscrimination Power = {:.2e}".format(
                         popt[1], popt[2], popt[4], popt[5], discrimination_power))
-            plot.set_ydata(gaussian_dict[gaussian_type_fit](datax,*popt))
-            hist.set_xdata(center)
-            hist.set_ydata(n)
-            axfit.set_ylim(0,n.max()*1.01)
+            plot.set_xdata(gaussian_dict[gaussian_type_fit](datax,*popt))
+            hist.set_xdata(n)
+            hist.set_ydata(center)
+            axfit.set_xlim(0,n.max()*1.01)
             fig.canvas.draw_idle()
+
+        #line_select_callback(clic, release)
 
         slider.on_changed(update)
         fig.canvas.draw_idle()
     def toggle_selector(event):
-        print(' Key pressed.')
         nonlocal gaussian_type_fit
         if event.key in ['Q', 'q'] and toggle_selector.RS.active:
             print(' RectangleSelector deactivated.')
@@ -212,63 +225,91 @@ def plot_LY(E,LY,ax, axfit):
                                            spancoords='pixels',
                                            interactive=True)
     plt.connect('key_press_event', toggle_selector)
+    def save_para(_):
+        nonlocal discrimination_power
+        nonlocal popt
+        nonlocal pcov
+        nonlocal gaussian_type_fit
+        nonlocal dictionary
+        path = dictionary['path']
+        dictionary_handler.update_dict(path + 'dictionary.json',{'discrimination_power': discrimination_power})
+        try:
+            dictionary_handler.update_dict(path + 'dictionary.json', {'paramater_LY_'+gaussian_type_fit: popt.tolist(),
+                                                                 'uncertainty_LY_'+gaussian_type_fit:
+                                                                     (np.diag(pcov)**0.5).tolist()})
+        except AttributeError:
+            pass
+        print('discrimination power saved')
+
+
+    save_button_ax = fig.add_axes([0.92, 0.05, 0.05, 0.08]) # Define button axes coordinates
+    save_button = Button(save_button_ax, 'Save')
+    save_button.on_clicked(save_para)
+
+
+def plot_correlation_heat_light(correlation, correlationl, ax):
+    ax.scatter(correlation, correlationl, s=0.1)
+
+
+def plot(i,j):
+    path, dictionary = get_data.get_path(i,j)
+    if 'filename' in dictionary:
+        E, correlation, amplitude, rt, time_array = get_data.get_pulses(dictionary, ['Energy', 'Correlation', 'Amplitude_filtered',
+                                                                         'Rise_time', 'Trigger_position'])
+        try:
+            para_correlation = dictionary['correlation']
+            selection = correlation > cut_function(amplitude, *para_correlation)
+        except KeyError:
+            print('no correlation cut found')
+            selection = np.ones_like(E, dtype=bool)
+        E_sel = E[selection]
+
+        #get_data.show_time(ax_rt, scat_rt, time_array, dictionary, type='heat')
+
+    if 'filename_light' in dictionary:
+        ampl, rtl = get_data.get_pulses(dictionary, keys=['Energy', 'Rise_time'], type='light')
+        '''fig_rt, ax_rt = plt.subplots()
+        scat_rt = plot_rise(E, rt, ax_rt)'''
+        '''sel_ene = np.logical_and(ampl < 300, ampl > 200)
+        sel_rt = np.logical_and(rtl < 0.5, rtl > 0)
+        print(np.mean(rtl[np.logical_and(sel_ene, sel_rt)]))'''
+    if 'filename_trigheat' in dictionary:
+        amplt = get_data.get_pulses(dictionary, keys=['Energy'], type='trigheat')[0]
+        LY = amplt[selection] / E_sel * 1000  # in keV/MeV
+        fig_LY = plt.figure(figsize=(12, 6))
+        # Add a gridspec with two rows and two columns and a ratio of 1 to 4 between
+        # the size of the marginal axes and the main axes in both directions.
+        # Also adjust the subplot parameters for a square plot.
+        gs = fig_LY.add_gridspec(1, 2, width_ratios=(4, 1),
+                              left=0.1, right=0.9, bottom=0.1, top=0.9,
+                              wspace=0.05, hspace=0.05)
+        # Create the Axes.
+        ax_LY = fig_LY.add_subplot(gs[0, 0])
+        axfit = fig_LY.add_subplot(gs[0, 1], sharey=ax_LY)
+
+        axfit.tick_params(left=False, right=False, labelleft=False,
+                          labelbottom=False, bottom=False)
+        plot_LY(E_sel, LY, ax_LY, axfit, dictionary)
+        '''fig_hvl, ax_hvsl = plt.subplots()
+        plot_light(E_sel,amplt[selection],ax_hvsl)'''
+    print(len(E_sel))
+
 
 
 if __name__ == '__main__':
-    import matplotlib.pylab as pylab
+    import dictionary_handler
+    import get_data
+    save_plot = 1
+    if save_plot == 1:
+        import matplotlib.pylab as pylab
 
-    params = {'legend.fontsize': 20.,
-              'figure.figsize': (15, 5),
-              'axes.labelsize': 20.,
-              'axes.titlesize': 20.,
-              'xtick.labelsize': 20.,
-              'ytick.labelsize': 20.}
-    pylab.rcParams.update(params)
-    path, dictionary = get_data.get_path()
-    axes = []
-    print(dictionary)
-    try :
-        filename, filename_light, filename_trigheat, heatcalib = get_data.get_values(dictionary, ["filename", "filename_light", "filename_trigheat", "heat_calib"])
-    except ValueError:
-        print("miss the heat calib")
-    heatcalib_function = np.poly1d(heatcalib)
-    if filename != 0:
-        E, amplitude, correlation, TV, riset, decayt, Sm, time = get_data.get_heat(path, filename, heatcalib_function, dictionary)
-        try:
-            para_correlation = dictionary['correlation']
-            print('cut from dictionary')
-            selection = np.logical_and(correlation > cut_function(amplitude, *para_correlation), amplitude < 0.25)
-        except KeyError:
-            print('no correlation cut found')
-            selection = amplitude < 0.25
-        E_sel = E[selection]
-        fig_heat_histo, ax_heat_histo = plt.subplots()
-        axes.append(ax_heat_histo)
-        hist_heat_cut(E, selection,ax_heat_histo)
-    if filename_light != 0:
-        ampl,risetl = get_data.import_light(path, filename_light)
-        coeff_light, error_coeff_light = dictionary["light_calib"]
-        ampl_fit = ampl * coeff_light
-
-    if filename_trigheat != 0:
-        amplt, trig_rt = import_triglight(path, filename_trigheat, selection)
-        amplt_fit = amplt * coeff_light
-        LY = amplt_fit / E_sel
-        fig_light_vs_light, ax_light_vs_light = plt.subplots()
-        axes.append(ax_light_vs_light)
-        plot_light(E_sel, amplt_fit, ax_light_vs_light)
-        figLY, axLY = plt.subplots()
-        axes.append(axLY)
-        axfit = figLY.add_axes([0.75, 0.75, 0.2, 0.2])
-
-        axes.append(axfit)
-        plot_LY(E_sel, LY,axLY, axfit)
-        axfit.tick_params(left = False, right = False , labelleft = False ,
-                labelbottom = False, bottom = False)
-        fig_rise_time_light, ax_rise_time_light = plt.subplots()
-        axes.append(ax_rise_time_light)
-        plot_rise(amplt_fit, trig_rt, ax_rise_time_light)
-
-
-
+        params = {'legend.fontsize': 20.,
+                  'figure.figsize': (15, 5),
+                  'axes.labelsize': 20.,
+                  'axes.titlesize': 20.,
+                  'xtick.labelsize': 20.,
+                  'ytick.labelsize': 20.}
+        pylab.rcParams.update(params)
+    plot(11,7)
+    plot(11, 11)
     plt.show()

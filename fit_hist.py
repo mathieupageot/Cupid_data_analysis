@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from matplotlib.widgets import Slider
+
+import dictionary_handler
 from cuts import cut_function
 import get_data
 
@@ -89,7 +91,7 @@ if __name__ == "__main__":
     from stabilize import function_stabilize
     path, filename, filename_light, filename_trigheat,data_E,data_amp= get_data.get_path(peak=True)
     peaks = get_data.ntd_array(path+filename)
-    dict = get_data.load_dict(path + "dictionary.json")
+    dict = Create_dict.load_dict(path + "dictionary.json")
     try:
         stabparam, meanvalue = dict["stabilisation"]
         amp = function_stabilize(peaks[:, 2], peaks[:, 3], stabparam, meanvalue)

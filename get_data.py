@@ -1,6 +1,21 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import datetime
+from utility.display_bin import plot_window, decode_binary
+from dictionary_handler import load_dict, update_dict, get_values
 import json
+
+
+def save_non_homog_list(non_homogeneous_array,non_homogeneous_array2,path):
+    with open(path, 'w') as file:
+        json.dump(non_homogeneous_array, file)
+        json.dump(non_homogeneous_array2, file)
+
+
+def function_stabilize(amp, baseline, stab_param, mean_value):
+    p = np.poly1d(stab_param)
+    return amp / (p(baseline)) * mean_value
+
 def find_local_maxima(data):
     local_maxima = []
     for i in range(1, len(data) - 1):
@@ -8,8 +23,9 @@ def find_local_maxima(data):
             local_maxima.append(data[i])
     local_maxima.append(data[-1])
     return local_maxima
-def get_duration(i,j):
-    path, dictionary = get_path(i, j)
+
+
+def get_duration(path, dictionary):
     filename = dictionary["filename"]
     try:
         peaks = ntd_array(path + filename)
@@ -17,129 +33,150 @@ def get_duration(i,j):
         filename = dictionary["filename_light"]
         peaks = ntd_array(path + filename)
     duration = np.sum(find_local_maxima(peaks[:, 0]))
-    update_dict(path + "dictionary.json", "duration", duration)
+    update_dict(path + "dictionary.json", {"duration": duration})
     return duration
+
+
 def ntd_array(path):
-    print(path)
     A = np.loadtxt(path, usecols=(n for n in range(20)))
     return A
 
 
-def load_dict(dict_path):
-    with open(dict_path, 'r') as json_file:
-        dict = json.load(json_file)
-    return dict
+def get_time(fig, scat, time_array):
+    scat.set_picker(5)
+
+    def onpick(event):
+        ind = event.ind
+        print('onpick scatter:', time_array[ind] - 5000)
+
+    fig.canvas.mpl_connect('pick_event', onpick)
 
 
-def update_dict(dict_path, key, value):
-    with open(dict_path, 'r') as json_file:
-        data = json.load(json_file)
+def show_time(ax, scat, time_array, dictionary, type='heat'):
+    fig = ax.get_figure()
+    scat.set_picker(5)
+    fig_display, ax_display = plt.subplots()
+    plot_display, = ax_display.plot(np.zeros(1000))
+    path = dictionary["path"]
     try:
-        value = value.tolist()
-    except:
-        pass
-    data[key] = value
-    with open(dict_path, 'w') as json_file:
-        json.dump(data, json_file, indent=4)
-def get_values(dictionary,key_list):
-    value_set = []
-    for key in key_list:
-        if key in dictionary:
-            print(dictionary[key])
-            value_set.append(dictionary[key])
-    return value_set
+        filename = dictionary["filename_" + type]
+    except KeyError:
+        filename = dictionary["filename"]
+    file_path = path + filename[:-4] + ".bin"
+    data = decode_binary(file_path, data_type=np.float32)
+    def onpick(event):
+        ind = event.ind[0]
+        plot_window(ax_display, plot_display, time_array[ind]//5000, 1000, data, center=0.5)
+        fig_display.canvas.draw()
+
+    fig.canvas.mpl_connect('pick_event', onpick)
 
 
-def get_path(i=7, j=1):
-    # input("file?")
-    j = int(j)
-    filenum = i
-    filebis = j
+def get_position(target_tuple,infos):
+    x_position = y_position = None
+    # Iterate through the nested list to find the target tuple
+    for x, sublist in enumerate(infos):
+        for y, inner_list in enumerate(sublist):
+            if target_tuple == inner_list:
+                x_position, y_position = x, y
+                break
+    return x_position, y_position
 
-    if i == 3:  # measurement 0003
-        path = '/Users/mp274748/Documents/data_arg/second_set/'
-    if i == 2:
-        path = '/Users/mp274748/Documents/data_arg/first_set2/'
-    if i == 1:
-        path = '/Users/mp274748/Documents/data_arg/first_set/'
-    if i == 4:
-        path = '/Users/mp274748/Documents/data_arg/RUN93/'
-        if j == 1:
-            name = '60b_ara1'
-        elif j == 2:
-            name = '60b_ara2'
-        elif j == 3:
-            name = '61b_ara1'
-        elif j == 4:
-            name = '61b_ara2'
-        elif j == 5:
-            name = '60b_UV1'
-        elif j == 6:
-            name = '60b_UV2'
-        elif j == 7:
-            name = '61b_UV1'
-        elif j == 8:
-            name = '61b_UV2'
-        path += name + '/'
-    # data from edi
-    if filenum == 5:
-        path = '/Users/mp274748/Documents/data_edi/'
-        if filebis == 0:
-            name = 'RAW'
-        if filebis == 1:
-            name = 'DIF'
-        path += name + '/'
-        filename_light = 0
-        filename_trigheat = 0
-    # data form RUN96 measurement 2
-    if filenum == 6:
-        if filebis == 54:
-            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/5_trig4/'
-        elif filebis == 64:
-            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/6_trig4/'
-        else:
-            path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement2/channel' + str(filebis) + '/'
-    # data form RUN96 measurement 6
-    if filenum == 7:
-        path = '/Users/mp274748/Documents/data_arg/RUN96/Measurement6/'
-        if filebis == 0:
-            path += 'LMO18/'
-        elif filebis == 1:
-            path += 'LMO26/'
-    dictionary = load_dict(path + "dictionary.json")
+
+def update_infofile(i,j,path):
+    with open('/Users/mp274748/Documents/data_arg/pathlist.json', 'r') as json_file:
+        b_list = json.load(json_file)
+    path_list = b_list[0]
+    infos = b_list[1]
+    target_tuple = [i,j]
+    x_position, y_position = get_position(target_tuple, infos)
+    if y_position != None:
+        path_list[x_position][y_position] = path
+    else:
+        infos[i].append([i,j])
+        path_list[i].append(path)
+    save_non_homog_list(path_list, infos, '/Users/mp274748/Documents/data_arg/pathlist.json')
+
+
+
+
+def get_path(i=11, j=12):
+    target_tuple = [i, j]
+    with open('/Users/mp274748/Documents/data_arg/pathlist.json', 'r') as json_file:
+        b_list = json.load(json_file)
+    path_list = b_list[0]
+    infos = b_list[1]
+    x_position, y_position = get_position(target_tuple, infos)
+    path = path_list[x_position][y_position]
+    try:
+        dictionary = load_dict(path + "dictionary.json")
+    except FileNotFoundError:
+        dictionary = {}
+        print('no dict at this path', i,j)
     try:
         duration = dictionary["duration"]
-    except ValueError:
-        duration = get_duration(i,j)
-    print('duration of the run :', str(datetime.timedelta(seconds=duration/5000)))
+    except KeyError:
+        try:
+            duration = get_duration(path, dictionary)
+        except KeyError:
+            return path, dictionary
+    print('duration of the run :', str(datetime.timedelta(seconds=duration /4 / 5000)))
     return path, dictionary
 
 
-def get_heat(path, filename, p, dict):
-    from stabilize import function_stabilize
-    peaks = ntd_array(path + filename)
+def stab_amp(dictionary, peaks):
     try:
-        stabparam, meanvalue = dict["stabilisation"]
+        stabparam, meanvalue = dictionary["stabilisation"]
         amp_stab = function_stabilize(peaks[:, 2], peaks[:, 3], stabparam, meanvalue)
-    except:
-        amp_stab = np.load(path + 'amp_stab.npy')
-    E = p(amp_stab)
-    correlation = peaks[:, 5]
-    TV = peaks[:, 8]
-    riset = peaks[:, 11]
-    decayt = peaks[:, 12]
-    Sm = peaks[:, 9] / amp_stab
-    time = peaks[:, 0]
-    return E, amp_stab, correlation, TV, riset, decayt, Sm, time
+    except KeyError:
+        amp_stab = peaks[:, 2]
+    return amp_stab
 
 
-def import_light(path, filename_light):
-    peaksl = ntd_array(path + filename_light)
-    correlation = peaksl[:, 5]
-    sel_corr = correlation>0.95
-    ampl = peaksl[sel_corr, 2]
-    riset = peaksl[sel_corr, 11]
-    return ampl,riset
+def get_pulses(dictionary, keys=['Amplitude_filtered'], type='heat'):
+    dictionary_pulses_info = np.array(
+        ['Trigger_position', 'Amplitude_raw', 'Amplitude_filtered', 'Baseline', 'Baseline_rms',
+         'Correlation', 'TV', 'TVL', 'TVR', 'fitted_amplitude', 'Intercept', 'Rise_time',
+         'Decay_time', 'Delay_amplitude', 'Mean_time', 'Surface_raw', 'Surface_filtered',
+         'Chi_square', 'Controlled_fitted_amplitude', 'Controlled_intercept'])
+    path = dictionary['path']
+    print(path)
 
-i_s = [1,2,3,4,5,6,7]
-j_s = [[1],[1],[1],[j for j in range(1,9)],[0,1],[54,64,4,5,6],[0,1]]
+    try:
+        filename = dictionary['filename_' + type]
+    except KeyError:
+        filename = dictionary['filename']
+    try :
+        peaks = ntd_array(path + filename)
+    except FileNotFoundError:
+        peaks = ntd_array('/'.join(path.split("/")[:-2]) + '/' + filename)
+    dictionary_pulses = {}
+    if any(key in keys for key in ['amp_stab', 'Sm', 'Energy']):
+        amp_stab = stab_amp(dictionary, peaks)
+        dictionary_pulses['amp_stab'] = amp_stab
+    if 'Sm' in keys:
+        dictionary_pulses['Sm'] = peaks[:, 9] / amp_stab
+    if 'Energy' in keys:
+        if type == 'heat':
+            calib_function = np.poly1d(dictionary['heat_calib'])
+        elif type == 'light' or type == 'trigheat':
+            calib_function = np.poly1d([dictionary['light_calib'],0])
+        else:
+            calib_function = np.poly1d([1,0])
+        dictionary_pulses['Energy'] = calib_function(amp_stab)
+    for key in keys:
+        try:
+            i = int(np.argwhere(dictionary_pulses_info == key))
+            dictionary_pulses[key] = peaks[:, i]
+        except TypeError:
+            pass
+    return get_values(dictionary_pulses, keys)
+
+j_run97 = [1,2,3,4,5,6,7,8,11,12]
+i_s = [1, 2, 3, 4, 5, 6, 7,8,9,10,11]
+j_s = [[1], [1], [1], [j for j in range(1, 9)], [0, 1], [54, 64, 4, 5, 6], [0, 1],[0,1,2,3],j_run97,j_run97,j_run97]
+
+if __name__ == '__main__':
+    infos = [[[i,j] for j in j_s[k]]for k,i in enumerate(i_s)]
+    tempory = [[get_path(i,j)[0] for j in j_s[k]]for k,i in enumerate(i_s)]
+    save_non_homog_list(tempory,infos,'/Users/mp274748/Documents/data_arg/pathlist.json')

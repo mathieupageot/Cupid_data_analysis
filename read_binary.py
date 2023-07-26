@@ -27,7 +27,7 @@ def plot_pulse_spectrum(xp,pulse, index):
 
     return freq[freq>=0]*5000, np.absolute(sp)[freq>=0]
 indexes = [1]
-
+'''
 for i in indexes:
     path = "/Users/mp274748/Documents/data_arg/RUN96/Measurement6/chan{}/".format(i)
     file_path_spec = path + "000015_20230609T235012_00{}_000.bin_spec.bin".format(i)
@@ -71,4 +71,17 @@ ax.set_title('Noise and Mean pulse spectrum')
 fig.legend()
 fig2.legend()
 # Show the plot
+plt.show()'''
+
+path = "/Users/mp274748/Documents/data_arg/RUN97/meas2/channel11/"
+file_path_spec1 = path + "000009_20230718T190341_011_000.bin_spec_hawraa.bin"
+decoded_data1 = decode_binary(file_path_spec1)
+file_path_spec2 = path + "000009_20230718T190341_011_000.bin_spec.bin"
+decoded_data2 = decode_binary(file_path_spec2)
+x = np.arange(len(decoded_data1))
+ax.plot(x[:len(decoded_data1)//2], decoded_data1[:len(decoded_data1)//2],label="channel11 hawraa, noise")
+ax.plot(x[:len(decoded_data2)//2], decoded_data2[:len(decoded_data2)//2]*1e12,label="channel11, noise")
+ax.set_xscale('log')
+ax.set_yscale('log')
+plt.legend()
 plt.show()

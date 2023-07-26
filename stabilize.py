@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import lasso_selection
+
+import dictionary_handler
+from utility import lasso_selection
 import get_data
 from matplotlib.widgets import Button
-from scipy.optimize import curve_fit
 
 
 def gauss(x, H, A, x0, sigma):
@@ -17,11 +18,11 @@ def function_stabilize(amp, baseline, stab_param, mean_value):
 
 def stabilize(amp,Sm, baseline,path):
     fig,axs = plt.subplots(2)
+    fig2, axs2 = plt.subplots()
     amp_stab = []
     plt.subplots_adjust(bottom=0.25)
     button_ax = plt.axes([0.8, 0.05, 0.1, 0.05])
     button = Button(button_ax, 'Save')
-    fig2,axs2 = plt.subplots()
     z = [0,0]
     meanvalue = 0
     pts=axs2.scatter(amp,Sm,s=0.1)
@@ -47,7 +48,6 @@ def stabilize(amp,Sm, baseline,path):
                     axs[1].scatter(baseline, amp_stab, s=0.1)
                     axs[1].set_ylabel('Heat Amplitude Stabilized')
                     axs[1].set_xlabel('Heat Baseline Stabilized')
-                    print(len(amp_stab))
 
 
 
@@ -62,9 +62,8 @@ def stabilize(amp,Sm, baseline,path):
             fig2.canvas.draw()
             fig.canvas.draw()
     def save_stab(_):
-        print(z,meanvalue)
-        get_data.update_dict(path+"dictionary.json", "stabilisation", [z, meanvalue])
-        print('Stabilized data saved, length of the data:',len(amp_stab))
+        dictionary_handler.update_dict(path + "dictionary.json", {"stabilisation": [z, meanvalue]})
+        print('Stabilized data saved, slope: ', z[0])
     axs[0].set_ylabel('Heat Amplitude Raw')
     axs[0].set_xlabel('Heat Baseline Raw')
     fig2.canvas.mpl_connect("key_press_event", accept)
