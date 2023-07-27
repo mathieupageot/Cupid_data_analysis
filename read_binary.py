@@ -14,9 +14,7 @@ def decode_binary(file_path):
     with open(file_path, 'rb') as file:
         binary_data = file.read()
     return np.frombuffer(binary_data, dtype=np.float64)
-fig3,ax3 = plt.subplots()
-fig2, ax2 = plt.subplots()
-fig,ax = plt.subplots()
+
 def plot_pulse_spectrum(xp,pulse, index):
 
     sp = np.fft.fft(pulse)
@@ -73,15 +71,25 @@ fig2.legend()
 # Show the plot
 plt.show()'''
 
-path = "/Users/mp274748/Documents/data_arg/RUN97/meas2/channel11/"
-file_path_spec1 = path + "000009_20230718T190341_011_000.bin_spec_hawraa.bin"
-decoded_data1 = decode_binary(file_path_spec1)
-file_path_spec2 = path + "000009_20230718T190341_011_000.bin_spec.bin"
-decoded_data2 = decode_binary(file_path_spec2)
-x = np.arange(len(decoded_data1))
-ax.plot(x[:len(decoded_data1)//2], decoded_data1[:len(decoded_data1)//2],label="channel11 hawraa, noise")
-ax.plot(x[:len(decoded_data2)//2], decoded_data2[:len(decoded_data2)//2]*1e12,label="channel11, noise")
-ax.set_xscale('log')
-ax.set_yscale('log')
-plt.legend()
+def compare_spectrum(channel, file_path_spec1, file_path_spec2, ax):
+    decoded_data1 = decode_binary(file_path_spec1)
+    decoded_data2 = decode_binary(file_path_spec2)
+    x = np.arange(len(decoded_data1))
+    ax.plot(x[:len(decoded_data1)//2], decoded_data1[:len(decoded_data1)//2],label="channel{} meas3, noise".format(channel))
+    ax.plot(x[:len(decoded_data2)//2], decoded_data2[:len(decoded_data2)//2],label="channel{} meas2, noise".format(channel))
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    plt.legend()
+if __name__ == '__main__':
+    channel = '02'
+    '''fig3,ax3 = plt.subplots()
+    fig2, ax2 = plt.subplots()'''
+    fig, ax = plt.subplots()
+
+    channelnum = int(channel)
+    path1 = "/Users/mp274748/Documents/data_arg/RUN97/meas3/channel{}/".format(channelnum)
+    path2 = "/Users/mp274748/Documents/data_arg/RUN97/meas2/channel{}/".format(channelnum)
+    file_path_spec1 = path1 + "000013_20230720T173837_0{}_000.bin_spec.bin".format(channel)
+    file_path_spec2 = path2 + "000009_20230718T190341_0{}_000.bin_spec.bin".format(channel)
+    compare_spectrum(channel, file_path_spec1, file_path_spec2, ax)
 plt.show()
