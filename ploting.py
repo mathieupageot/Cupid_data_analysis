@@ -15,6 +15,15 @@ def gaussian(x, a, x0, sigma):
     return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
+def get_error(f,p,err):
+    x = [np.random.normal(p[i], err[i], 10000) for i in range(len(p))]
+    y = f(x)
+    n, bins = np.histogram(y, 50)
+    center = (bins[:-1] + bins[1:]) / 2
+    popt, pcov = curve_fit(gaussian, center, n)
+    return popt[2]
+
+
 def double_gaussian(x, amp1, center1, sigma1, amp2, center2, sigma2):
     gaussian1 = amp1 * np.exp(-(x - center1)**2 / (2 * sigma1**2))
     gaussian2 = amp2 * np.exp(-(x - center2)**2 / (2 * sigma2**2))
@@ -107,6 +116,35 @@ class Clicker:
         self.xdata = x
         self.ydata = y
 
+def Discrimination_power_func(x):
+    return np.abs(x[0]-x[2])/np.sqrt(x[1]**2/x[3]**2)
+
+def update_gaussian_fit(gaussian_type_fit, text_parameters,n,center):
+    if gaussian_type_fit == 'single':
+        popt, pcov = curve_fit(gaussian_dict[gaussian_type_fit], center, n, [n.max(), center.mean(), np.std(center)])
+        text_parameters.set_text("$LY_0$ = {:.2e} \n$\sigma$ = {:.2e}".format(popt[1], popt[2]))
+        discrimination_power = None
+    elif gaussian_type_fit == 'double':
+        amp1_guess = np.max(n) - np.min(n)
+        center1_guess = center[np.argmax(n)]
+        sigma1_guess = (np.max(center) - np.min(center)) / 10
+        amp2_guess = amp1_guess / 2
+        center2_guess = center1_guess + (np.max(center) - np.min(center)) / 4
+        sigma2_guess = sigma1_guess
+        initial_guess = [amp1_guess, center1_guess, sigma1_guess, amp2_guess, center2_guess, sigma2_guess]
+        popt, pcov = curve_fit(gaussian_dict[gaussian_type_fit], center, n,
+                               initial_guess)
+        p_error = np.sqrt(np.diag(pcov))
+        sel=[False,True,True,False,True,True]
+
+        discrimination_power = Discrimination_power_func(popt[sel])
+        discrimination_power_error = get_error(Discrimination_power_func,popt[sel],p_error[sel])
+        text_parameters.set_text(
+            "$LY_01$ = {:.2e} $\pm$ {:.0e} \n$\sigma1$ = {:.2e} $\pm$ {:.0e}\n$LY_02$ = {:.2e} $\pm$ {:.0e}"
+            " \n$\sigma2$ = {:.2e} $\pm$ {:.0e}\nDiscrimination Power = {:.2e} $\pm$ {:.0e}".format(
+                popt[1],p_error[1], popt[2],p_error[2], popt[4],p_error[4], popt[5], p_error[5],
+                discrimination_power,discrimination_power_error))
+    return discrimination_power, popt, pcov
 
 def plot_LY(E,LY,ax, axfit, dictionary):
     clic = Clicker(3500,-0.2)
@@ -122,9 +160,8 @@ def plot_LY(E,LY,ax, axfit, dictionary):
     ax.set_ylim(np.percentile(LY, 5),np.percentile(LY, 80))
     ax_slider = fig.add_axes([0.92, 0.20, 0.01, 0.6])
     slider = Slider(ax_slider, 'bins', valmin=10, valmax=1000, valinit=nbins, valstep=1, orientation="vertical")
-    text_parameters = ax.text(0.5, 0.83, 'No parameters yet', fontsize=12, bbox=dict(facecolor='white', edgecolor='white'),color='black', transform=ax.transAxes,verticalalignment='top')
-    gaussian_type_fit = 'single'
-    text_gaussian_type = ax.text(0.5, 0.90, "gaussian type : "+gaussian_type_fit,bbox=dict(facecolor='white', edgecolor='white'), fontsize=12, color='black', transform=ax.transAxes,verticalalignment='top')
+    text_parameters = ax.text(0.5, 0.93, 'No parameters yet', fontsize=12, bbox=dict(facecolor='white', edgecolor='white'),color='black', transform=ax.transAxes,verticalalignment='top')
+    gaussian_type_fit = 'double'
     # Create a box selection event handler
     discrimination_power = None
     popt, pcov = None, None
@@ -147,23 +184,7 @@ def plot_LY(E,LY,ax, axfit, dictionary):
         center = (bins[:-1] + bins[1:]) / 2
         hist, = axfit.plot(n ,center, linewidth=.5, ds='steps-mid')
         datax = np.linspace(selected_LY.min(),selected_LY.max(),1000)
-        if gaussian_type_fit == 'single':
-
-            popt, pcov = curve_fit(gaussian_dict[gaussian_type_fit], center, n,
-                                   [n.max(), center.mean(), np.std(center)])
-            text_parameters.set_text("$LY_0$ = {:.2e} \n$\sigma$ = {:.2e}".format(popt[1], popt[2]))
-        elif gaussian_type_fit == 'double':
-            amp1_guess = np.max(n) - np.min(n)
-            center1_guess = center[np.argmax(n)]
-            sigma1_guess = (np.max(center) - np.min(center)) / 10
-            amp2_guess = amp1_guess / 2
-            center2_guess = center1_guess + (np.max(center) - np.min(center)) / 4
-            sigma2_guess = sigma1_guess
-            initial_guess = [amp1_guess, center1_guess, sigma1_guess, amp2_guess, center2_guess, sigma2_guess]
-            popt, pcov = curve_fit(gaussian_dict[gaussian_type_fit], center, n,
-                                   initial_guess)
-            discrimination_power = np.absolute(popt[1]-popt[4])/np.sqrt(popt[2]**2+popt[5]**2)
-            text_parameters.set_text("$LY_01$ = {:.2e} \n$\sigma1$ = {:.2e}\n$LY_02$ = {:.2e} \n$\sigma2$ = {:.2e}\nDiscrimination Power = {:.2e}".format(popt[1], popt[2],popt[4], popt[5],discrimination_power))
+        discrimination_power, popt, pcov = update_gaussian_fit(gaussian_type_fit, text_parameters, n, center)
         plot, = axfit.plot(gaussian_dict[gaussian_type_fit](datax, *popt),datax)
 
 
@@ -176,24 +197,7 @@ def plot_LY(E,LY,ax, axfit, dictionary):
             nbins = int(slider.val)
             n, bins = np.histogram(selected_LY, nbins)
             center = (bins[:-1] + bins[1:]) / 2
-            if gaussian_type_fit == 'single':
-                popt, pcov = curve_fit(gaussian_dict[gaussian_type_fit],center,n,[n.max(), center.mean(), np.std(center)])
-                text_parameters.set_text("$LY_0$ = {:.2e} \n$\sigma$ = {:.2e}".format(popt[1], popt[2]))
-            elif gaussian_type_fit == 'double':
-
-                amp1_guess = np.max(n) - np.min(n)
-                center1_guess = center[np.argmax(n)]
-                sigma1_guess = (np.max(center) - np.min(center)) / 10
-                amp2_guess = amp1_guess / 2
-                center2_guess = center1_guess + (np.max(center) - np.min(center)) / 4
-                sigma2_guess = sigma1_guess
-                initial_guess = [amp1_guess, center1_guess, sigma1_guess, amp2_guess, center2_guess, sigma2_guess]
-                popt, pcov = curve_fit(gaussian_dict[gaussian_type_fit], center, n,
-                                       initial_guess)
-                discrimination_power = np.absolute(popt[1] - popt[4]) / np.sqrt(popt[2] ** 2 + popt[5] ** 2)
-                text_parameters.set_text(
-                    "$LY_01$ = {:.2e} \n$\sigma1$ = {:.2e}\n$LY_02$ = {:.2e} \n$\sigma2$ = {:.2e}\nDiscrimination Power = {:.2e}".format(
-                        popt[1], popt[2], popt[4], popt[5], discrimination_power))
+            discrimination_power, popt, pcov = update_gaussian_fit(gaussian_type_fit, text_parameters, n, center)
             plot.set_xdata(gaussian_dict[gaussian_type_fit](datax,*popt))
             hist.set_xdata(n)
             hist.set_ydata(center)
@@ -213,10 +217,10 @@ def plot_LY(E,LY,ax, axfit, dictionary):
             print(' RectangleSelector activated.')
         if event.key in ['D','d']:
             gaussian_type_fit = 'double'
-            text_gaussian_type.set_text("gaussian type : "+gaussian_type_fit)
+            print("gaussian type : "+gaussian_type_fit)
         if event.key in ['O','o']:
             gaussian_type_fit = 'single'
-            text_gaussian_type.set_text("gaussian type : " + gaussian_type_fit)
+            print("gaussian type : " + gaussian_type_fit)
 
     toggle_selector.RS = RectangleSelector(ax, line_select_callback,
                                            useblit=True,
