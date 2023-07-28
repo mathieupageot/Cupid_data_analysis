@@ -150,10 +150,9 @@ def get_Rbol_Vbol(channel_num, bias_V, V_I_path):
     return R_bols[working_point], V_bols[working_point]
 
 
-def plot_reduced_sensibility(channels, bias_Vs, T0s, R0s, Sensibilities,V_I_path):
+def plot_reduced_sensibility(channels, bias_Vs, T0s, R0s, Sensibilities,V_I_path,ax):
     ethas = np.zeros_like(bias_Vs)
     R_bols = np.zeros_like(bias_Vs)
-    fig, ax = plt.subplots()
     for i, (channel, bias_V, T0, R0, Sensibility) in enumerate(zip(channels, bias_Vs, T0s, R0s, Sensibilities)):
         R_bol, V_bol = get_Rbol_Vbol(channel, bias_V, V_I_path)
         if len(R_bol)==0:
@@ -166,13 +165,18 @@ def plot_reduced_sensibility(channels, bias_Vs, T0s, R0s, Sensibilities,V_I_path
     ax.scatter(R_bols[channels620], ethas[channels620], label='UV620',s=100,marker='v')
     ax.set_xlabel('Resistance (M$\Omega$)')
     ax.set_ylabel('Reduced Sensitivity $\eta$ ($GeV^{-1}$)')
-    plt.legend(loc = 'upper left')
+
 
 channels = [3,4,5,6,7,8,11,12]
 Sensibilities = [5.08,58,75.7,54.3,5.8,73.4,108,86.2]
 bias_Vs = 2 * np.array([3,0.5,0.3,0.5,4,0.5,0.5,0.5])
 filename_VI = "15mK_2Gohm_all.xlsx"
 V_I_path = "/Users/mp274748/Documents/data_arg/RUN97/I-V/" + filename_VI
-plot_reduced_sensibility(channels, bias_Vs, T0s, R0s, Sensibilities,V_I_path)
+fig, ax = plt.subplots()
+plot_reduced_sensibility(channels, bias_Vs, T0s, R0s, Sensibilities,V_I_path,ax)
+RS_run4 = np.array([2.25E-04,1.99E-04,7.60E-05,1.86E-04])*1.e3
+R_run4 = np.array([1.40E+06,1.30E+06,1.50E+06,1.00E+06])*1.e-6
+ax.scatter(R_run4,RS_run4, label='RUN4 ntds',s=100,marker='x')
+plt.legend(loc = 'upper left')
 plt.show()
 
